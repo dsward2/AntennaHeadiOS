@@ -56,17 +56,71 @@ final class WatchAPIClient {
     func categories() async throws -> [CategorySummary] { try await get(APIEndpoint.categories) }
 
     func tune(frequencyID: Int64) async throws -> NowPlayingStatus {
-        try await send("POST", APIEndpoint.tune, body: try JSONEncoder().encode(TuneFrequencyRequest(frequencyID: frequencyID)))
+        try await post(APIEndpoint.tune, TuneFrequencyRequest(frequencyID: frequencyID))
     }
 
     func startScan(categoryID: Int64) async throws -> NowPlayingStatus {
-        try await send("POST", APIEndpoint.startScan, body: try JSONEncoder().encode(StartCategoryScanRequest(categoryID: categoryID)))
+        try await post(APIEndpoint.startScan, StartCategoryScanRequest(categoryID: categoryID))
     }
 
     func stop() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.stop, body: nil) }
 
+    // MARK: Other sources
+
+    func devices() async throws -> [DeviceSummary] { try await get(APIEndpoint.devices) }
+
+    func startDevice(name: String) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.startDevice, StartDeviceRequest(deviceName: name))
+    }
+
+    func controlBoothStatus() async throws -> ControlBoothStatus { try await get(APIEndpoint.controlBoothStatus) }
+    func launchControlBooth() async throws -> ControlBoothStatus { try await send("POST", APIEndpoint.controlBoothLaunch, body: nil) }
+
+    func startControlBoothPipeline(named name: String) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.controlBoothStart, StartControlBoothPipelineRequest(pipelineName: name))
+    }
+
+    func stopControlBooth() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothStop, body: nil) }
+    func startAirPlay() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothAirPlayStart, body: nil) }
+    func stopAirPlay() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothAirPlayStop, body: nil) }
+
+    func gqrxStatus() async throws -> GqrxStatus { try await get(APIEndpoint.gqrxStatus) }
+    func launchGqrx() async throws -> GqrxStatus { try await send("POST", APIEndpoint.gqrxLaunch, body: nil) }
+
+    func startGqrx(channels: Int) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.gqrxStart, StartGqrxRequest(channels: channels))
+    }
+
+    func gqrxBookmarks() async throws -> [GqrxBookmarkSummary] { try await get(APIEndpoint.gqrxBookmarks) }
+
+    func playGqrxBookmark(frequencyHz: Int64, channels: Int) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.gqrxBookmarkPlay, PlayGqrxBookmarkRequest(frequencyHz: frequencyHz, channels: channels))
+    }
+
+    func audioFiles() async throws -> FolderListing { try await get(APIEndpoint.audioFiles) }
+
+    func startAudioFiles(_ request: StartAudioFilesRequest) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.audioFilesStart, request)
+    }
+
+    func textToSpeechFiles() async throws -> FolderListing { try await get(APIEndpoint.textToSpeech) }
+
+    func startTextToSpeech(_ request: StartTextToSpeechRequest) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.textToSpeechStart, request)
+    }
+
+    func rssFeeds() async throws -> [RSSFeedSummary] { try await get(APIEndpoint.rssFeeds) }
+
+    func startRSSHeadlines(_ request: StartRSSHeadlinesRequest) async throws -> NowPlayingStatus {
+        try await post(APIEndpoint.rssHeadlinesStart, request)
+    }
+
     private func get<T: Decodable>(_ path: String) async throws -> T {
         try await send("GET", path, body: nil)
+    }
+
+    private func post<Body: Encodable, T: Decodable>(_ path: String, _ body: Body) async throws -> T {
+        try await send("POST", path, body: try JSONEncoder().encode(body))
     }
 
     private func send<T: Decodable>(_ method: String, _ path: String, body: Data?) async throws -> T {

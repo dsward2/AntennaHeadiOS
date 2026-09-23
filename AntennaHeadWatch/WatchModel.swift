@@ -15,6 +15,18 @@ final class WatchModel {
     private(set) var nowPlaying: NowPlayingStatus?
     private(set) var favorites: [FrequencySummary]?
     private(set) var categories: [CategorySummary]?
+
+    // Other sources, each loaded when its screen opens (WatchModel+Sources).
+    var devices: [DeviceSummary]?
+    var controlBoothStatus: ControlBoothStatus?
+    var gqrxStatus: GqrxStatus?
+    var gqrxBookmarks: [GqrxBookmarkSummary]?
+    /// Why the bookmarks couldn't be loaded (Gqrx's remote control off, say).
+    /// Shown in place of the list, since it's a state, not a failed action.
+    var gqrxBookmarksMessage: String?
+    var audioFiles: FolderListing?
+    var textToSpeechFiles: FolderListing?
+    var rssFeeds: [RSSFeedSummary]?
     /// How the last API call reached the server.
     private(set) var route: WatchAPIClient.Route?
     private(set) var isLoading = false
@@ -23,7 +35,7 @@ final class WatchModel {
     /// background (where the app only runs while audio plays).
     var isForeground = true
 
-    private var client: WatchAPIClient?
+    private(set) var client: WatchAPIClient?
     /// The message the poll last put in `errorMessage`, so a later successful
     /// poll clears only its own error, never a failed action's.
     private var pollErrorMessage: String?
@@ -47,6 +59,14 @@ final class WatchModel {
             nowPlaying = nil
             favorites = nil
             categories = nil
+            devices = nil
+            controlBoothStatus = nil
+            gqrxStatus = nil
+            gqrxBookmarks = nil
+            gqrxBookmarksMessage = nil
+            audioFiles = nil
+            textToSpeechFiles = nil
+            rssFeeds = nil
         }
         errorMessage = nil
         isLoading = true
@@ -121,7 +141,10 @@ final class WatchModel {
         await player.listen(to: url, authorization: server.basicAuthorization)
     }
 
-    private func perform(_ action: (WatchAPIClient) async throws -> NowPlayingStatus) async {
+    /// Runs a "start listening to X" call: shows the server's new Now
+    /// Playing, and jumps the Watch's stream (if listening) to the live edge
+    /// so the change is heard now.
+    func perform(_ action: (WatchAPIClient) async throws -> NowPlayingStatus) async {
         guard let client else { return }
         do {
             apply(try await action(client))
@@ -149,7 +172,7 @@ final class WatchModel {
 
     /// Shows `error`, unless it's only the cancellation of a request whose
     /// `.task` went away.
-    private func report(_ error: Error) {
+    func report(_ error: Error) {
         if error is CancellationError { return }
         if let urlError = error as? URLError, urlError.code == .cancelled { return }
         errorMessage = error.localizedDescription

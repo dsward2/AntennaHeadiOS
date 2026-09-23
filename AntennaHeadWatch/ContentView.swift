@@ -64,6 +64,11 @@ private struct MainView: View {
                         Label("Categories", systemImage: "square.grid.2x2")
                     }
                 }
+                NavigationLink {
+                    SourcesView(model: model)
+                } label: {
+                    Label("More Sources", systemImage: "ellipsis.circle")
+                }
             }
 
             if let errorMessage = model.errorMessage {

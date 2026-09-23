@@ -116,6 +116,14 @@ iPhone app (`com.dsward.AntennaHeadiOS.watchkitapp`). It has AntennaHead TV's
 core features: Now Playing, Favorites (tap to tune), Categories (tap to
 scan), Stop, and listening on Bluetooth headphones.
 
+**More Sources** starts the other AntennaHead sources on the Mac, each with
+one tap: ControlBooth pipelines, the AirPlay Receiver, Gqrx (launch, or play
+a bookmark, in stereo or mono), the Mac's input devices, Play Audio Files
+(everything, a playlist, or one file), Text to Speech (everything or one
+file), and Speak RSS Headlines (all feeds or one). Order and Repeat are
+remembered. Selecting several files at once, Spatial Audio, Captions, and
+Recordings are left to the other clients.
+
 **Reaching the server.** watchOS has no VPN. The Watch calls the API
 directly first. That works at home, and also away from home when its traffic
 goes through a nearby iPhone that's on the VPN (tested: iPhone on cellular
