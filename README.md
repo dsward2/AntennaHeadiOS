@@ -134,6 +134,13 @@ iPhone for a minute. Now Playing shows "via iPhone" when that happens. The
 relay carries `/api/v1/` calls only. Audio always comes straight from the
 server, so listening needs a direct path.
 
+WatchConnectivity only reaches the iPhone while the Watch app is in the
+foreground, so the relay is used only then. It wakes the iPhone app in the
+background if needed. In the background the Watch uses the direct path,
+which it needs for audio anyway. Measured with the iPhone app closed: 60
+relayed requests in a row with no failures, 100–300 ms each, up to about
+1 s right after the iPhone app was woken.
+
 **Servers.** The iPhone app sends its saved servers and web logins to the
 Watch (`Shared/WatchLink.swift` is compiled into both apps). The Watch keeps
 them in its Keychain. You can also add a server on the Watch, for use
