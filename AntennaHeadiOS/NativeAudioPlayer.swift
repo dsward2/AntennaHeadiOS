@@ -177,7 +177,11 @@ final class NativeAudioPlayer {
         activateSession()
 
         let asset = AVURLAsset(url: source.url)
-        asset.resourceLoader.setDelegate(authDelegate, queue: .main)
+        // Only when a login is needed; otherwise let AVFoundation load the
+        // stream entirely on its own.
+        if authDelegate.credential != nil {
+            asset.resourceLoader.setDelegate(authDelegate, queue: .main)
+        }
         let item = AVPlayerItem(asset: asset)
         observe(item)
         player.replaceCurrentItem(with: item)
@@ -239,7 +243,10 @@ final class NativeAudioPlayer {
     private func timeControlStatusChanged() {
         switch player.timeControlStatus {
         case .playing:
-            reconnectAttempt = 0
+            // Reset the backoff only once playback has lasted a while, so a
+            // stream that starts and immediately fails backs off instead of
+            // retrying every second forever.
+            resetBackoffAfterSteadyPlayback()
             stallWatchdog?.cancel()
             stallWatchdog = nil
             setState(.playing, playingStatusText())
@@ -263,6 +270,17 @@ final class NativeAudioPlayer {
             }
         @unknown default:
             break
+        }
+    }
+
+    private var steadyPlaybackTask: Task<Void, Never>?
+
+    private func resetBackoffAfterSteadyPlayback() {
+        steadyPlaybackTask?.cancel()
+        steadyPlaybackTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(15))
+            guard let self, !Task.isCancelled, self.player.timeControlStatus == .playing else { return }
+            self.reconnectAttempt = 0
         }
     }
 
@@ -359,9 +377,29 @@ final class NativeAudioPlayer {
         if let entry = item?.errorLog()?.events.last {
             parts.append(Self.describe(entry))
         }
+        if let airPlay = Self.airPlayOutputName() {
+            // Seen in practice: the iPhone's output was AirPlay to the Mac's
+            // own ControlBooth receiver, which relays back into AntennaHead —
+            // a loop, and the AirPlay session failed every time with
+            // CoreMediaErrorDomain 'nope'. The error itself says nothing, so
+            // name the route, which is what the listener can actually fix.
+            parts.insert("Audio output is AirPlay to “\(airPlay)”, which failed — choose iPhone or headphones in Control Center", at: 0)
+        }
         let text = parts.isEmpty ? fallback : parts.joined(separator: " · ")
         Self.log.error("Playback error: \(text, privacy: .public)")
+        #if DEBUG
+        if let error { print("[Player] full error: \(error as NSError)") }
+        if let events = item?.accessLog()?.events, let last = events.last {
+            print("[Player] access log: \(events.count) events, uri=\(last.uri ?? "-") server=\(last.serverAddress ?? "-") segments=\(last.numberOfMediaRequests) bytes=\(last.numberOfBytesTransferred) stalls=\(last.numberOfStalls) dropped=\(last.numberOfDroppedVideoFrames)")
+        }
+        #endif
         return text
+    }
+
+    /// The AirPlay device audio is going to, if the output is AirPlay.
+    private static func airPlayOutputName() -> String? {
+        AVAudioSession.sharedInstance().currentRoute.outputs
+            .first { $0.portType == .airPlay }?.portName
     }
 
     private static func describe(_ entry: AVPlayerItemErrorLogEvent) -> String {

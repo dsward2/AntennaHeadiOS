@@ -134,6 +134,16 @@ struct AntennaHeadWebView: UIViewRepresentable {
             case "pageLoaded":
                 if let url { player.defaultLiveURL = url }
                 pushPlayerState(player.state, player.statusText)
+                #if DEBUG
+                // `-autoplayLive YES` launch argument: start the live stream
+                // without a tap, for testing on a device from the Mac.
+                // `-liveURLOverride <url>`: play that instead (e.g. to bypass
+                // AntennaHead's HLS proxy while diagnosing).
+                if UserDefaults.standard.bool(forKey: "autoplayLive"), player.source == nil, let url {
+                    let override = UserDefaults.standard.string(forKey: "liveURLOverride").flatMap(URL.init(string:))
+                    player.play(.live(override ?? url))
+                }
+                #endif
             case "playLive":
                 guard let url = url ?? player.defaultLiveURL else { return }
                 // The page sends this on every Listen press. If the live
