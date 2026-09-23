@@ -288,7 +288,7 @@ final class NativeAudioPlayer {
                 // Re-read the current item rather than sending the observed
                 // one across; a replaced item's failure no longer matters.
                 guard let current = self.player.currentItem, current.status == .failed else { return }
-                self.scheduleRecovery(Self.describe(current.error, fallback: "Stream error"))
+                self.scheduleRecovery(self.describe(current.error, item: current, fallback: "Stream error"))
             }
         }
 
@@ -298,7 +298,20 @@ final class NativeAudioPlayer {
             center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { [weak self] note in
                 let error = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
                 MainActor.assumeIsolated {
-                    self?.scheduleRecovery(Self.describe(error, fallback: "Stream interrupted"))
+                    guard let self else { return }
+                    self.scheduleRecovery(self.describe(error, item: self.player.currentItem, fallback: "Stream interrupted"))
+                }
+            },
+            // Non-fatal trouble (a segment 404, a slow download) lands in the
+            // item's error log without failing the item — log it so a stall
+            // that follows can be explained.
+            center.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let entry = self.player.currentItem?.errorLog()?.events.last else { return }
+                    Self.log.error("HLS error log: \(Self.describe(entry), privacy: .public)")
+                    #if DEBUG
+                    print("[Player] HLS error log: \(Self.describe(entry))")
+                    #endif
                 }
             },
             center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
@@ -323,13 +336,39 @@ final class NativeAudioPlayer {
         }
     }
 
-    private static func describe(_ error: Error?, fallback: String) -> String {
-        guard let error else { return fallback }
-        let nsError = error as NSError
-        if nsError.domain == NSURLErrorDomain, nsError.code == NSURLErrorUserAuthenticationRequired {
+    /// A status line that says what actually went wrong. AVFoundation's
+    /// top-level error is usually just "The operation couldn't be
+    /// completed", so this adds the underlying error codes and, when there
+    /// is one, the item's HLS error-log entry (HTTP status, failing URL).
+    private func describe(_ error: Error?, item: AVPlayerItem?, fallback: String) -> String {
+        if let nsError = error as NSError?,
+           nsError.domain == NSURLErrorDomain, nsError.code == NSURLErrorUserAuthenticationRequired {
             return "Login needed"
         }
-        return error.localizedDescription
+        var parts: [String] = []
+        if let nsError = error as NSError? {
+            var codes = "\(nsError.domain) \(nsError.code)"
+            var underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+            while let next = underlying {
+                codes += " ← \(next.domain) \(next.code)"
+                underlying = next.userInfo[NSUnderlyingErrorKey] as? NSError
+            }
+            let reason = nsError.localizedFailureReason ?? nsError.localizedDescription
+            parts.append("\(reason) [\(codes)]")
+        }
+        if let entry = item?.errorLog()?.events.last {
+            parts.append(Self.describe(entry))
+        }
+        let text = parts.isEmpty ? fallback : parts.joined(separator: " · ")
+        Self.log.error("Playback error: \(text, privacy: .public)")
+        return text
+    }
+
+    private static func describe(_ entry: AVPlayerItemErrorLogEvent) -> String {
+        var text = "HLS \(entry.errorDomain) \(entry.errorStatusCode)"
+        if let comment = entry.errorComment, !comment.isEmpty { text += ": \(comment)" }
+        if let uri = entry.uri { text += " (\(uri))" }
+        return text
     }
 
     // MARK: Audio session notifications
@@ -460,6 +499,9 @@ final class NativeAudioPlayer {
 
     private func setState(_ newState: State, _ text: String) {
         Self.log.info("\(newState.rawValue, privacy: .public): \(text, privacy: .public)")
+        #if DEBUG
+        print("[Player] \(newState.rawValue): \(text)")   // visible with `devicectl … launch --console`
+        #endif
         state = newState
         statusText = text
         updateNowPlayingInfo()
