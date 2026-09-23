@@ -109,8 +109,48 @@ xcrun devicectl device process launch --device <UDID> --console com.dsward.Anten
 `-liveURLOverride` plays a different URL (for example, LiveAudioServer
 directly, bypassing AntennaHead's proxy).
 
+## Apple Watch
+
+The `AntennaHeadWatch` target is a watchOS 10 companion app, embedded in the
+iPhone app (`com.dsward.AntennaHeadiOS.watchkitapp`). It has AntennaHead TV's
+core features: Now Playing, Favorites (tap to tune), Categories (tap to
+scan), Stop, and listening on Bluetooth headphones.
+
+**Reaching the server.** watchOS has no VPN. The Watch calls the API
+directly first. That works at home, and also away from home when its traffic
+goes through a nearby iPhone that's on the VPN (tested: iPhone on cellular
+with WireGuard, Watch Wi-Fi off, and the stream played on the Watch). When a
+direct call fails for lack of a network path, the Watch asks the iPhone app
+to make it instead (`WatchSync`, over WatchConnectivity), and keeps using the
+iPhone for a minute. Now Playing shows "via iPhone" when that happens. The
+relay carries `/api/v1/` calls only. Audio always comes straight from the
+server, so listening needs a direct path.
+
+**Servers.** The iPhone app sends its saved servers and web logins to the
+Watch (`Shared/WatchLink.swift` is compiled into both apps). The Watch keeps
+them in its Keychain. You can also add a server on the Watch, for use
+without the iPhone app. Watch → Servers also shows how the Watch is
+connected.
+
+Stop stops the tuning on the Mac, and listening continues into the filler
+audio, as in the other clients.
+
+Debug builds accept `-forceRelay YES` (always use the iPhone relay), e.g.
+`xcrun devicectl device process launch --device <watch> com.dsward.AntennaHeadiOS.watchkitapp -- -forceRelay YES`.
+`Diagnostics.swift` (temporary) logs lifecycle events and main-thread stalls
+to `Documents/diagnostics.log` in the Watch app's container. It's there to
+catch a one-time case where the app wouldn't come back to the foreground
+while audio played in the background. Copy the log with
+`xcrun devicectl device copy from --device <watch> --domain-type appDataContainer --domain-identifier com.dsward.AntennaHeadiOS.watchkitapp --source Documents/diagnostics.log --destination diagnostics.log`.
+
+Installing directly on the Watch with devicectl needs the iPhone connected
+to the Mac by USB. The first build for a new Watch needs
+`-allowProvisioningDeviceRegistration`.
+
 ## Not yet done
 
 - Trust AntennaHead's self-signed HTTPS certificate on first use (pinning).
 - A setting to turn off `resumesAfterAllInterruptions`.
-- The Apple Watch companion described in the feasibility study.
+- Watch: HTTPS with AntennaHead's self-signed certificate, and a login on
+  the stream (sent as a header, which hasn't been tested against a server
+  with the login on).

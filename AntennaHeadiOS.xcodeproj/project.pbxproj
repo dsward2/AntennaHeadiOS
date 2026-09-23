@@ -8,10 +8,37 @@
 
 /* Begin PBXBuildFile section */
 		A1C0000000000000000000A1 /* AntennaHeadAPI in Frameworks */ = {isa = PBXBuildFile; productRef = A1C0000000000000000000B1 /* AntennaHeadAPI */; };
+		A1C0000000000000000000A2 /* AntennaHeadAPI in Frameworks */ = {isa = PBXBuildFile; productRef = A1C0000000000000000000B2 /* AntennaHeadAPI */; };
+		A1C0000000000000000000A3 /* AntennaHeadWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = A1C0000000000000000000C2 /* AntennaHeadWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A1C000000000000000000121 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1C000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1C0000000000000000000E2;
+			remoteInfo = AntennaHeadWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A1C000000000000000000115 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				A1C0000000000000000000A3 /* AntennaHeadWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A1C0000000000000000000C1 /* AntennaHeadiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AntennaHeadiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1C0000000000000000000C2 /* AntennaHeadWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AntennaHeadWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -22,6 +49,13 @@
 			);
 			target = A1C0000000000000000000E1 /* AntennaHeadiOS */;
 		};
+		A1C0000000000000000000D4 /* Exceptions for "AntennaHeadWatch" folder in "AntennaHeadWatch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1C0000000000000000000E2 /* AntennaHeadWatch */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +65,19 @@
 				A1C0000000000000000000D2 /* Exceptions for "AntennaHeadiOS" folder in "AntennaHeadiOS" target */,
 			);
 			path = AntennaHeadiOS;
+			sourceTree = "<group>";
+		};
+		A1C0000000000000000000D3 /* AntennaHeadWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1C0000000000000000000D4 /* Exceptions for "AntennaHeadWatch" folder in "AntennaHeadWatch" target */,
+			);
+			path = AntennaHeadWatch;
+			sourceTree = "<group>";
+		};
+		A1C0000000000000000000D5 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -44,6 +91,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1C0000000000000000000F2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1C0000000000000000000A2 /* AntennaHeadAPI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,6 +106,8 @@
 			isa = PBXGroup;
 			children = (
 				A1C0000000000000000000D1 /* AntennaHeadiOS */,
+				A1C0000000000000000000D3 /* AntennaHeadWatch */,
+				A1C0000000000000000000D5 /* Shared */,
 				A1C000000000000000000102 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,6 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				A1C0000000000000000000C1 /* AntennaHeadiOS.app */,
+				A1C0000000000000000000C2 /* AntennaHeadWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -73,13 +131,16 @@
 				A1C000000000000000000111 /* Sources */,
 				A1C0000000000000000000F1 /* Frameworks */,
 				A1C000000000000000000112 /* Resources */,
+				A1C000000000000000000115 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A1C000000000000000000122 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A1C0000000000000000000D1 /* AntennaHeadiOS */,
+				A1C0000000000000000000D5 /* Shared */,
 			);
 			name = AntennaHeadiOS;
 			packageProductDependencies = (
@@ -87,6 +148,30 @@
 			);
 			productName = AntennaHeadiOS;
 			productReference = A1C0000000000000000000C1 /* AntennaHeadiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A1C0000000000000000000E2 /* AntennaHeadWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1C000000000000000000203 /* Build configuration list for PBXNativeTarget "AntennaHeadWatch" */;
+			buildPhases = (
+				A1C000000000000000000113 /* Sources */,
+				A1C0000000000000000000F2 /* Frameworks */,
+				A1C000000000000000000114 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1C0000000000000000000D3 /* AntennaHeadWatch */,
+				A1C0000000000000000000D5 /* Shared */,
+			);
+			name = AntennaHeadWatch;
+			packageProductDependencies = (
+				A1C0000000000000000000B2 /* AntennaHeadAPI */,
+			);
+			productName = AntennaHeadWatch;
+			productReference = A1C0000000000000000000C2 /* AntennaHeadWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -100,6 +185,9 @@
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					A1C0000000000000000000E1 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					A1C0000000000000000000E2 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -122,12 +210,20 @@
 			projectRoot = "";
 			targets = (
 				A1C0000000000000000000E1 /* AntennaHeadiOS */,
+				A1C0000000000000000000E2 /* AntennaHeadWatch */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A1C000000000000000000112 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1C000000000000000000114 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -144,7 +240,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1C000000000000000000113 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1C000000000000000000122 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1C0000000000000000000E2 /* AntennaHeadWatch */;
+			targetProxy = A1C000000000000000000121 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A1C000000000000000000211 /* Debug */ = {
@@ -276,6 +387,74 @@
 			};
 			name = Release;
 		};
+		A1C000000000000000000231 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AntennaHead;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MMFBWVS455;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AntennaHeadWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AntennaHead;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.dsward.AntennaHeadiOS;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dsward.AntennaHeadiOS.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		A1C000000000000000000232 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AntennaHead;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MMFBWVS455;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AntennaHeadWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AntennaHead;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.dsward.AntennaHeadiOS;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dsward.AntennaHeadiOS.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -297,6 +476,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A1C000000000000000000203 /* Build configuration list for PBXNativeTarget "AntennaHeadWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1C000000000000000000231 /* Debug */,
+				A1C000000000000000000232 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -308,6 +496,11 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		A1C0000000000000000000B1 /* AntennaHeadAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1C000000000000000000301 /* XCLocalSwiftPackageReference "../AntennaHeadAPI" */;
+			productName = AntennaHeadAPI;
+		};
+		A1C0000000000000000000B2 /* AntennaHeadAPI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A1C000000000000000000301 /* XCLocalSwiftPackageReference "../AntennaHeadAPI" */;
 			productName = AntennaHeadAPI;

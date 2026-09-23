@@ -31,6 +31,9 @@ struct SavedServer: Codable, Identifiable, Hashable {
 final class ServerStore {
     private(set) var servers: [SavedServer] = []
     private(set) var currentServerID: UUID?
+    /// Bumped on every change, including password-only ones that leave
+    /// `servers` equal, so the Watch's copy can be kept current.
+    private(set) var revision = 0
 
     private let defaults = UserDefaults.standard
     private static let serversKey = "savedServers"
@@ -52,12 +55,14 @@ final class ServerStore {
     func connect(to server: SavedServer) {
         currentServerID = server.id
         defaults.set(server.id.uuidString, forKey: Self.currentKey)
+        revision += 1
     }
 
     /// Back to the server list.
     func disconnect() {
         currentServerID = nil
         defaults.removeObject(forKey: Self.currentKey)
+        revision += 1
     }
 
     /// Adds `server`, or replaces the saved one with the same `id`.
@@ -90,6 +95,7 @@ final class ServerStore {
         } else {
             Keychain.write(password, account: server.id.uuidString)
         }
+        revision += 1
     }
 
     /// The server's web login as a credential, or `nil` if none is saved.
@@ -102,6 +108,7 @@ final class ServerStore {
         if let data = try? JSONEncoder().encode(servers) {
             defaults.set(data, forKey: Self.serversKey)
         }
+        revision += 1
     }
 }
 
