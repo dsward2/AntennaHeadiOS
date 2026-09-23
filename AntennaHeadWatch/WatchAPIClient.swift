@@ -1,5 +1,6 @@
 import AntennaHeadAPI
 import Foundation
+import os
 
 /// Talks to one AntennaHead server's JSON API, directly when the Watch can
 /// reach it and through the iPhone app (`PhoneLink`) when it can't.
@@ -33,6 +34,8 @@ final class WatchAPIClient {
             }
         }
     }
+
+    private static let log = Logger(subsystem: "com.dsward.AntennaHeadiOS.watchkitapp", category: "API")
 
     let server: WatchLink.Server
     private let link: PhoneLink
@@ -162,7 +165,7 @@ final class WatchAPIClient {
             preferRelayUntil = nil
             return result
         } catch let error as URLError where Self.meansNoPath(error) && link.canRelay {
-            Diagnostics.note("direct \(path) failed (\(error.code.rawValue)); relaying through iPhone")
+            Self.log.info("Direct \(path, privacy: .public) failed (\(error.code.rawValue)); relaying through the iPhone")
             let result = try await relayed(method, path, body: body)
             preferRelayUntil = Date().addingTimeInterval(60)
             return result

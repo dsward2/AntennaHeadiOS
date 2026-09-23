@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import Security
 
 /// The servers the Watch knows: the iPhone's saved servers (sent over
@@ -16,6 +17,7 @@ final class WatchServerStore {
     private(set) var selectedID: UUID?
 
     private static let selectedKey = "selectedServerID"
+    private static let log = Logger(subsystem: "com.dsward.AntennaHeadiOS.watchkitapp", category: "Servers")
 
     init() {
         if let list: WatchLink.ServerList = WatchKeychain.read(account: "phoneServers") {
@@ -50,7 +52,7 @@ final class WatchServerStore {
         phoneServers = list.servers
         phoneCurrentID = list.currentID
         WatchKeychain.write(list, account: "phoneServers")
-        Diagnostics.note("received \(list.servers.count) server(s) from iPhone")
+        Self.log.info("Received \(list.servers.count) server(s) from the iPhone")
     }
 
     /// Adds `server`, or replaces the Watch-added one with the same `id`.

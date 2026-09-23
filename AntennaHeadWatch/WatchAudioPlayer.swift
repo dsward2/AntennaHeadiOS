@@ -376,7 +376,6 @@ final class WatchAudioPlayer {
 
     private func setState(_ newState: State, _ text: String) {
         Self.log.info("\(newState.rawValue, privacy: .public): \(text, privacy: .public)")
-        Diagnostics.note("player \(newState.rawValue): \(text)")
         state = newState
         statusText = text
         updateNowPlayingInfo()

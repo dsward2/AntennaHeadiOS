@@ -152,11 +152,9 @@ audio, as in the other clients.
 
 Debug builds accept `-forceRelay YES` (always use the iPhone relay), e.g.
 `xcrun devicectl device process launch --device <watch> com.dsward.AntennaHeadiOS.watchkitapp -- -forceRelay YES`.
-`Diagnostics.swift` (temporary) logs lifecycle events and main-thread stalls
-to `Documents/diagnostics.log` in the Watch app's container. It's there to
-catch a one-time case where the app wouldn't come back to the foreground
-while audio played in the background. Copy the log with
-`xcrun devicectl device copy from --device <watch> --domain-type appDataContainer --domain-identifier com.dsward.AntennaHeadiOS.watchkitapp --source Documents/diagnostics.log --destination diagnostics.log`.
+The Watch app logs to the unified log under the subsystem
+`com.dsward.AntennaHeadiOS.watchkitapp` (categories Player, API,
+PhoneLink, Model, Servers).
 
 Installing directly on the Watch with devicectl needs the iPhone connected
 to the Mac by USB. The first build for a new Watch needs

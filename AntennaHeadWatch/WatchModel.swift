@@ -1,6 +1,7 @@
 import AntennaHeadAPI
 import Foundation
 import Observation
+import os
 
 /// The state the Watch screens render for the current server: Now Playing,
 /// favorites, and categories, plus the actions (tune, scan, Stop, listen).
@@ -8,6 +9,8 @@ import Observation
 @MainActor
 @Observable
 final class WatchModel {
+    private static let log = Logger(subsystem: "com.dsward.AntennaHeadiOS.watchkitapp", category: "Model")
+
     let store: WatchServerStore
     let link: PhoneLink
     let player: WatchAudioPlayer
@@ -91,7 +94,7 @@ final class WatchModel {
         do {
             apply(try await client.nowPlaying())
             if route != client.lastRoute {
-                Diagnostics.note("API route: \(client.lastRoute?.rawValue ?? "-")")
+                Self.log.info("API route: \(client.lastRoute?.rawValue ?? "-", privacy: .public)")
             }
             route = client.lastRoute
             if let pollErrorMessage, errorMessage == pollErrorMessage {
@@ -176,6 +179,6 @@ final class WatchModel {
         if error is CancellationError { return }
         if let urlError = error as? URLError, urlError.code == .cancelled { return }
         errorMessage = error.localizedDescription
-        Diagnostics.note("error: \(error.localizedDescription)")
+        Self.log.error("\(error.localizedDescription, privacy: .public)")
     }
 }
