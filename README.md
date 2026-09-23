@@ -75,13 +75,39 @@ Verified in the iOS Simulator against a live AntennaHead:
 - Pause, including that reconnects don't undo it
 - the fallback for an older server's page
 
-Not yet verified (needs a real iPhone):
+Verified on an iPhone 15 Pro Max:
+
+- live HLS playback of an AntennaHead source (iMic USB audio input)
+- the diagnostics that found a failure caused by a dead AirPlay route (see
+  Troubleshooting)
+
+Not yet verified:
 
 - automatic resume after real interruptions (notification sounds, calls, Siri)
 - Lock Screen controls
 - reconnects after the server restarts
 - web login against a server with Basic Auth turned on
 - recording playback
+
+## Troubleshooting
+
+**Plays for a second, then "reconnecting" over and over.** The iPhone's audio
+output is probably set to an AirPlay speaker that isn't responding, such as
+ControlBooth's AirPlay Receiver after it has been turned off. CoreMedia reports
+this only as `CoreMediaErrorDomain 1852797029` (`'nope'`). The app names the
+AirPlay speaker in its status line and shows an output picker. Choose iPhone
+there, or in Control Center.
+
+**Debugging on a device.** Debug builds print player state, the full error,
+and an access-log summary to stdout, and accept two launch arguments:
+
+```bash
+xcrun devicectl device process launch --device <UDID> --console com.dsward.AntennaHeadiOS -- -autoplayLive YES -liveURLOverride http://<mac>:8080/hls/index.m3u8
+```
+
+`-autoplayLive YES` starts the live stream without a tap, and
+`-liveURLOverride` plays a different URL (for example, LiveAudioServer
+directly, bypassing AntennaHead's proxy).
 
 ## Not yet done
 
