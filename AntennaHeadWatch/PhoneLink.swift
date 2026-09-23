@@ -1,4 +1,5 @@
 import Foundation
+import os
 import WatchConnectivity
 import WatchKit
 
@@ -30,6 +31,8 @@ final class PhoneLink: NSObject {
         }
     }
 
+    private static let log = Logger(subsystem: "com.dsward.AntennaHeadiOS.watchkitapp", category: "PhoneLink")
+
     private let store: WatchServerStore
     /// Relays waiting for the iPhone to become reachable.
     private var reachabilityWaiters: [UUID: CheckedContinuation<Bool, Never>] = [:]
@@ -60,14 +63,14 @@ final class PhoneLink: NSObject {
         let started = Date()
         do {
             let response = try await sendOnce(request)
-            Diagnostics.note(String(format: "relay %@ ok in %.0f ms", request.path, Date().timeIntervalSince(started) * 1000))
+            Self.log.info("Relayed \(request.path, privacy: .public) in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
             return response
         } catch let error as RelayError {
             guard case .failed(let message) = error else { throw error }
-            Diagnostics.note("relay \(request.path) failed (\(message)); retrying")
+            Self.log.error("Relay \(request.path, privacy: .public) failed (\(message, privacy: .public)); retrying")
             try? await Task.sleep(for: .milliseconds(500))
             let response = try await sendOnce(request)
-            Diagnostics.note(String(format: "relay %@ ok on retry in %.0f ms", request.path, Date().timeIntervalSince(started) * 1000))
+            Self.log.info("Relayed \(request.path, privacy: .public) on retry in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
             return response
         }
     }
@@ -135,7 +138,7 @@ extension PhoneLink: WCSessionDelegate {
         // Pick up a context that arrived while the app wasn't running.
         let context = session.receivedApplicationContext
         Task { @MainActor in
-            Diagnostics.note("WCSession activated (\(activationState.rawValue)), reachable \(session.isReachable)")
+            Self.log.info("WCSession activated (\(activationState.rawValue)), reachable \(session.isReachable)")
             if !context.isEmpty { self.apply(context: context) }
             self.reachabilityChanged()
         }
@@ -143,7 +146,7 @@ extension PhoneLink: WCSessionDelegate {
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
-            Diagnostics.note("iPhone reachable: \(session.isReachable)")
+            Self.log.info("iPhone reachable: \(session.isReachable)")
             self.reachabilityChanged()
         }
     }

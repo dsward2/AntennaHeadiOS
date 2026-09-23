@@ -9,12 +9,12 @@ import SwiftUI
 /// logins come from the iPhone app (`WatchLink`).
 @main
 struct AntennaHeadWatchApp: App {
-    @WKApplicationDelegateAdaptor private var delegate: DiagnosticsAppDelegate
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: WatchModel
 
     init() {
-        Diagnostics.start()
+        // Left behind by the temporary diagnostics in earlier builds.
+        try? FileManager.default.removeItem(at: URL.documentsDirectory.appending(path: "diagnostics.log"))
         let store = WatchServerStore()
         let link = PhoneLink(store: store)
         _model = State(initialValue: WatchModel(store: store, link: link, player: WatchAudioPlayer()))
@@ -25,7 +25,6 @@ struct AntennaHeadWatchApp: App {
             ContentView(model: model)
         }
         .onChange(of: scenePhase) { _, phase in
-            Diagnostics.note("scenePhase → \(phase)")
             model.isForeground = phase == .active
             if phase == .active {
                 model.player.appBecameActive()
