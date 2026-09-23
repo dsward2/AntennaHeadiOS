@@ -56,6 +56,11 @@ final class NativeAudioPlayer {
     private(set) var statusText = "Not playing"
     private(set) var source: Source?
 
+    /// Set when playback failed while audio was routed to this AirPlay
+    /// device; cleared once audio plays. ServerScreen shows an output
+    /// picker while it's set.
+    private(set) var airPlayProblemDevice: String?
+
     /// The page's live HLS URL, reported on page load so the Lock Screen
     /// Play button and the page's own ▶︎ button can start the stream before
     /// any Listen button has been pressed.
@@ -247,6 +252,7 @@ final class NativeAudioPlayer {
             // stream that starts and immediately fails backs off instead of
             // retrying every second forever.
             resetBackoffAfterSteadyPlayback()
+            airPlayProblemDevice = nil
             stallWatchdog?.cancel()
             stallWatchdog = nil
             setState(.playing, playingStatusText())
@@ -378,12 +384,14 @@ final class NativeAudioPlayer {
             parts.append(Self.describe(entry))
         }
         if let airPlay = Self.airPlayOutputName() {
-            // Seen in practice: the iPhone's output was AirPlay to the Mac's
-            // own ControlBooth receiver, which relays back into AntennaHead —
-            // a loop, and the AirPlay session failed every time with
-            // CoreMediaErrorDomain 'nope'. The error itself says nothing, so
-            // name the route, which is what the listener can actually fix.
-            parts.insert("Audio output is AirPlay to “\(airPlay)”, which failed — choose iPhone or headphones in Control Center", at: 0)
+            // Seen in practice: the iPhone's output was still set to the AirPlay
+            // speaker "ControlBooth" (the Mac's ControlBooth receiver) after that
+            // receiver had shut down. iOS kept the dead route, and every start
+            // failed about a second in with CoreMediaErrorDomain 'nope', an error
+            // that says nothing. The fix is the output route, so say that, and
+            // let ServerScreen offer the output picker.
+            airPlayProblemDevice = airPlay
+            return "This iPhone's audio output is set to the AirPlay speaker “\(airPlay)”, which isn't responding — tap the AirPlay button and choose iPhone."
         }
         let text = parts.isEmpty ? fallback : parts.joined(separator: " · ")
         Self.log.error("Playback error: \(text, privacy: .public)")

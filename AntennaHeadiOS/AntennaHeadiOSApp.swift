@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 
 @main
@@ -69,6 +70,11 @@ struct ServerScreen: View {
                     .padding(.top, 2)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let device = player.airPlayProblemDevice {
+                airPlayBanner(device)
+            }
+        }
         .onAppear {
             let credential = store.credential(for: server)
             player.setCredential(credential)
@@ -101,8 +107,40 @@ struct ServerScreen: View {
         .background(Color(.systemBackground))
     }
 
+    /// Shown when audio is routed to an AirPlay speaker that isn't working
+    /// (see `NativeAudioPlayer.airPlayProblemDevice`), with the system output
+    /// picker right there, so nobody has to find it in Control Center.
+    private func airPlayBanner(_ device: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "airplayaudio")
+                .foregroundStyle(.orange)
+            Text("Audio is going to the AirPlay speaker “\(device)”, which isn't responding.")
+                .font(.footnote)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            RoutePicker()
+                .frame(width: 44, height: 44)
+                .accessibilityLabel("Choose Audio Output")
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 70)   // clear of the page's own audio bar
+    }
+
     private func showServers() {
         player.stop()
         store.disconnect()
     }
+}
+
+/// The system audio output picker (the same list as Control Center's AirPlay
+/// button).
+private struct RoutePicker: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.prioritizesVideoDevices = false
+        return picker
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }
