@@ -1,0 +1,156 @@
+import AntennaHeadAPI
+import Foundation
+
+/// Talks to one AntennaHead server's JSON API, directly when the Watch can
+/// reach it and through the iPhone app (`PhoneLink`) when it can't.
+///
+/// Direct comes first: at home, or whenever the Watch's traffic is routed
+/// through a nearby iPhone that's on the VPN, it's faster and doesn't need
+/// the iPhone app. When a direct request fails for lack of a network path,
+/// the same request is relayed, and relaying stays preferred for a minute so
+/// the Now Playing poll doesn't wait out a direct timeout every time.
+@MainActor
+final class WatchAPIClient {
+    enum Route: String {
+        case direct = "Direct"
+        case iPhone = "via iPhone"
+    }
+
+    enum ClientError: LocalizedError {
+        case invalidAddress
+        case loginFailed
+        case badResponse(Int)
+        case server(String)
+        case decoding(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidAddress: "The server's address isn't valid."
+            case .loginFailed: "The server rejected the web login."
+            case .badResponse(let code): "The server returned HTTP \(code)."
+            case .server(let message): message
+            case .decoding(let error): "Couldn't understand the server's response: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    let server: WatchLink.Server
+    private let link: PhoneLink
+    private(set) var lastRoute: Route?
+    private var preferRelayUntil: Date?
+
+    private let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 6
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
+    init(server: WatchLink.Server, link: PhoneLink) {
+        self.server = server
+        self.link = link
+    }
+
+    func nowPlaying() async throws -> NowPlayingStatus { try await get(APIEndpoint.nowPlaying) }
+    func favorites() async throws -> [FrequencySummary] { try await get(APIEndpoint.favorites) }
+    func categories() async throws -> [CategorySummary] { try await get(APIEndpoint.categories) }
+
+    func tune(frequencyID: Int64) async throws -> NowPlayingStatus {
+        try await send("POST", APIEndpoint.tune, body: try JSONEncoder().encode(TuneFrequencyRequest(frequencyID: frequencyID)))
+    }
+
+    func startScan(categoryID: Int64) async throws -> NowPlayingStatus {
+        try await send("POST", APIEndpoint.startScan, body: try JSONEncoder().encode(StartCategoryScanRequest(categoryID: categoryID)))
+    }
+
+    func stop() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.stop, body: nil) }
+
+    private func get<T: Decodable>(_ path: String) async throws -> T {
+        try await send("GET", path, body: nil)
+    }
+
+    private func send<T: Decodable>(_ method: String, _ path: String, body: Data?) async throws -> T {
+        let (status, data) = try await perform(method, path, body: body)
+        guard (200...299).contains(status) else {
+            if status == 401 { throw ClientError.loginFailed }
+            if let apiError = try? JSONDecoder().decode(APIError.self, from: data) {
+                throw ClientError.server(apiError.error)
+            }
+            throw ClientError.badResponse(status)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw ClientError.decoding(error)
+        }
+    }
+
+    private func perform(_ method: String, _ path: String, body: Data?) async throws -> (Int, Data) {
+        #if DEBUG
+        // `-forceRelay YES` launch argument: always go through the iPhone,
+        // to test the relay without taking the server off the network.
+        if UserDefaults.standard.bool(forKey: "forceRelay") {
+            return try await relayed(method, path, body: body)
+        }
+        #endif
+        if let preferRelayUntil, preferRelayUntil > Date(), link.isReachable {
+            do {
+                return try await relayed(method, path, body: body)
+            } catch {
+                // The relay broke (the iPhone app went away, say); try direct.
+                self.preferRelayUntil = nil
+            }
+        }
+        do {
+            let result = try await direct(method, path, body: body)
+            preferRelayUntil = nil
+            return result
+        } catch let error as URLError where Self.meansNoPath(error) && link.isReachable {
+            Diagnostics.note("direct \(path) failed (\(error.code.rawValue)); relaying through iPhone")
+            let result = try await relayed(method, path, body: body)
+            preferRelayUntil = Date().addingTimeInterval(60)
+            return result
+        }
+    }
+
+    private func direct(_ method: String, _ path: String, body: Data?) async throws -> (Int, Data) {
+        guard let base = server.baseURL, let url = URL(string: path, relativeTo: base) else {
+            throw ClientError.invalidAddress
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        if let authorization = server.basicAuthorization {
+            request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await session.data(for: request)
+        lastRoute = .direct
+        return ((response as? HTTPURLResponse)?.statusCode ?? -1, data)
+    }
+
+    private func relayed(_ method: String, _ path: String, body: Data?) async throws -> (Int, Data) {
+        let response = try await link.relay(WatchLink.RelayRequest(serverID: server.id, method: method, path: path, body: body))
+        if let error = response.error {
+            throw PhoneLink.RelayError.failed("iPhone: \(error)")
+        }
+        lastRoute = .iPhone
+        return (response.status ?? -1, response.body ?? Data())
+    }
+
+    /// Errors that mean "no way to reach the server from here", as opposed to
+    /// the server answering badly. Only these are worth relaying.
+    private static func meansNoPath(_ error: URLError) -> Bool {
+        switch error.code {
+        case .notConnectedToInternet, .timedOut, .cannotConnectToHost, .cannotFindHost,
+             .networkConnectionLost, .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed:
+            true
+        default:
+            false
+        }
+    }
+}

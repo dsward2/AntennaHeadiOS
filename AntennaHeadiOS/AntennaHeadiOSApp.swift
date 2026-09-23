@@ -3,8 +3,14 @@ import SwiftUI
 
 @main
 struct AntennaHeadiOSApp: App {
-    @State private var store = ServerStore()
+    @State private var store: ServerStore
     @State private var player = NativeAudioPlayer()
+
+    init() {
+        let store = ServerStore()
+        _store = State(initialValue: store)
+        WatchSync.shared.start(store: store)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -30,6 +36,9 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { player.appBecameActive() }
+        }
+        .onChange(of: store.revision) {
+            WatchSync.shared.pushServers()
         }
     }
 }
