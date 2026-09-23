@@ -149,7 +149,7 @@ final class WatchAPIClient {
             return try await relayed(method, path, body: body)
         }
         #endif
-        if let preferRelayUntil, preferRelayUntil > Date(), link.isReachable {
+        if let preferRelayUntil, preferRelayUntil > Date(), link.canRelay {
             do {
                 return try await relayed(method, path, body: body)
             } catch {
@@ -161,7 +161,7 @@ final class WatchAPIClient {
             let result = try await direct(method, path, body: body)
             preferRelayUntil = nil
             return result
-        } catch let error as URLError where Self.meansNoPath(error) && link.isReachable {
+        } catch let error as URLError where Self.meansNoPath(error) && link.canRelay {
             Diagnostics.note("direct \(path) failed (\(error.code.rawValue)); relaying through iPhone")
             let result = try await relayed(method, path, body: body)
             preferRelayUntil = Date().addingTimeInterval(60)

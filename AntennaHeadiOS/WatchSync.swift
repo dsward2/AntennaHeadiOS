@@ -1,5 +1,6 @@
 import Foundation
 import os
+import UIKit
 import WatchConnectivity
 
 /// The iPhone side of the Watch link (see `WatchLink`): keeps the Watch's
@@ -62,7 +63,9 @@ final class WatchSync: NSObject {
               let url = URL(string: String(request.path.dropFirst()), relativeTo: base) else {
             return WatchLink.RelayResponse(error: "The server's address isn't valid.")
         }
-        var urlRequest = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        // Short enough that the reply reaches the Watch before its message
+        // times out.
+        var urlRequest = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
         urlRequest.httpMethod = request.method
         if let body = request.body {
             urlRequest.httpBody = body
@@ -107,7 +110,14 @@ extension WatchSync: WCSessionDelegate {
         }
         nonisolated(unsafe) let reply = replyHandler
         Task { @MainActor in
+            // WatchConnectivity may have launched or woken this app in the
+            // background just for this message; keep it running until the
+            // server answers and the reply is sent.
+            let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Watch relay")
+            defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
+            let started = Date()
             let response = await self.relay(request)
+            Self.log.info("Relayed \(request.method, privacy: .public) \(request.path, privacy: .public) → \(response.status.map(String.init) ?? response.error ?? "-", privacy: .public) in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
             let encoded = (try? JSONEncoder().encode(response)) ?? Data()
             reply([WatchLink.relayResponseKey: encoded])
         }
