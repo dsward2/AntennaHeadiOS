@@ -164,6 +164,4 @@ to the Mac by USB. The first build for a new Watch needs
 
 - Trust AntennaHead's self-signed HTTPS certificate on first use (pinning).
 - A setting to turn off `resumesAfterAllInterruptions`.
-- Watch: HTTPS with AntennaHead's self-signed certificate, and a login on
-  the stream (sent as a header, which hasn't been tested against a server
-  with the login on).
+- Watch: HTTPS with AntennaHead's self-signed certificate.
