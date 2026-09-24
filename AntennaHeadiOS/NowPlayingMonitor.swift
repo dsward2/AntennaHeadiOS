@@ -11,6 +11,10 @@ final class NowPlayingMonitor {
     private let player: NativeAudioPlayer
     private var task: Task<Void, Never>?
 
+    /// Called with every status the poll gets, after the player's Lock
+    /// Screen details are updated (CarPlay marks what's on the air with it).
+    var onStatus: ((NowPlayingStatus) -> Void)?
+
     init(player: NativeAudioPlayer) {
         self.player = player
     }
@@ -47,6 +51,7 @@ final class NowPlayingMonitor {
     }
 
     private func apply(_ status: NowPlayingStatus) {
+        defer { onStatus?(status) }
         if status.taskMode == .stopped {
             // Stop keeps the stream running into the filler audio (see the
             // server's Stop behavior), so this still describes what's heard.

@@ -3,18 +3,11 @@ import SwiftUI
 
 @main
 struct AntennaHeadiOSApp: App {
-    @State private var store: ServerStore
-    @State private var player = NativeAudioPlayer()
-
-    init() {
-        let store = ServerStore()
-        _store = State(initialValue: store)
-        WatchSync.shared.start(store: store)
-    }
+    private let services = AppServices.shared
 
     var body: some Scene {
         WindowGroup {
-            RootView(store: store, player: player)
+            RootView(store: services.store, player: services.player)
         }
     }
 }

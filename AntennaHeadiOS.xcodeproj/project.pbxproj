@@ -45,6 +45,7 @@
 		A1C0000000000000000000D2 /* Exceptions for "AntennaHeadiOS" folder in "AntennaHeadiOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"AntennaHeadiOS-CarPlay.entitlements",
 				Info.plist,
 			);
 			target = A1C0000000000000000000E1 /* AntennaHeadiOS */;
@@ -319,6 +320,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AntennaHead;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "AntennaHeadiOS/AntennaHeadiOS-CarPlay.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MMFBWVS455;
@@ -327,7 +329,6 @@
 				INFOPLIST_FILE = AntennaHeadiOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = AntennaHead;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "AntennaHead looks for your Mac on the local network so you can pick it instead of typing its address.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -355,6 +356,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AntennaHead;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "AntennaHeadiOS/AntennaHeadiOS-CarPlay.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MMFBWVS455;
@@ -363,7 +365,6 @@
 				INFOPLIST_FILE = AntennaHeadiOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = AntennaHead;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "AntennaHead looks for your Mac on the local network so you can pick it instead of typing its address.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
