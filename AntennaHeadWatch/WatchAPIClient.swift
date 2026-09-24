@@ -19,7 +19,10 @@ final class WatchAPIClient {
 
     enum ClientError: LocalizedError {
         case invalidAddress
-        case loginFailed
+        /// A 401 with no login saved. `fromPhone` says where to add one.
+        case loginNeeded(fromPhone: Bool)
+        /// A 401 with a login saved: it's wrong.
+        case loginRejected(fromPhone: Bool)
         case badResponse(Int)
         case server(String)
         case decoding(Error)
@@ -27,7 +30,14 @@ final class WatchAPIClient {
         var errorDescription: String? {
             switch self {
             case .invalidAddress: "The server's address isn't valid."
-            case .loginFailed: "The server rejected the web login."
+            case .loginNeeded(let fromPhone):
+                "This server needs a web login. " + (fromPhone
+                    ? "Add it in AntennaHead on your iPhone."
+                    : "Add it under Servers.")
+            case .loginRejected(let fromPhone):
+                "The server rejected the web login. " + (fromPhone
+                    ? "Check it in AntennaHead on your iPhone."
+                    : "Check it under Servers.")
             case .badResponse(let code): "The server returned HTTP \(code)."
             case .server(let message): message
             case .decoding(let error): "Couldn't understand the server's response: \(error.localizedDescription)"
@@ -38,6 +48,8 @@ final class WatchAPIClient {
     private static let log = Logger(subsystem: "com.dsward.AntennaHeadiOS.watchkitapp", category: "API")
 
     let server: WatchLink.Server
+    /// Whether the server came from the iPhone, where its login is edited.
+    private let isFromPhone: Bool
     private let link: PhoneLink
     private(set) var lastRoute: Route?
     private var preferRelayUntil: Date?
@@ -49,8 +61,9 @@ final class WatchAPIClient {
         return URLSession(configuration: configuration)
     }()
 
-    init(server: WatchLink.Server, link: PhoneLink) {
+    init(server: WatchLink.Server, isFromPhone: Bool, link: PhoneLink) {
         self.server = server
+        self.isFromPhone = isFromPhone
         self.link = link
     }
 
@@ -129,7 +142,11 @@ final class WatchAPIClient {
     private func send<T: Decodable>(_ method: String, _ path: String, body: Data?) async throws -> T {
         let (status, data) = try await perform(method, path, body: body)
         guard (200...299).contains(status) else {
-            if status == 401 { throw ClientError.loginFailed }
+            if status == 401 {
+                throw server.basicAuthorization == nil
+                    ? ClientError.loginNeeded(fromPhone: isFromPhone)
+                    : ClientError.loginRejected(fromPhone: isFromPhone)
+            }
             if let apiError = try? JSONDecoder().decode(APIError.self, from: data) {
                 throw ClientError.server(apiError.error)
             }

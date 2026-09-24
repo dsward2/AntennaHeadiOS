@@ -58,7 +58,7 @@ final class WatchModel {
         }
         if client?.server != server {
             if player.wantsToPlay, client != nil { player.stopListening() }
-            client = WatchAPIClient(server: server, link: link)
+            client = WatchAPIClient(server: server, isFromPhone: store.isFromPhone(server), link: link)
             nowPlaying = nil
             favorites = nil
             categories = nil
