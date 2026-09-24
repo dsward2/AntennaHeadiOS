@@ -7,14 +7,19 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            if let server = model.store.current {
+            if model.store.current != nil {
                 MainView(model: model)
-                    .task(id: server) { await model.connect() }
-                    .task(id: server.id) { await model.pollNowPlaying() }
             } else {
                 NoServerView(store: model.store)
             }
         }
+        // Changing the ID rebuilds the stack at its root: how a source screen
+        // (two levels down) gets back to Now Playing. (`dismiss()` on the
+        // Sources screen from the screen above it didn't pop on watchOS.)
+        // The tasks sit outside it, so going back doesn't reload everything.
+        .id(model.navigationRootID)
+        .task(id: model.store.current) { await model.connect() }
+        .task(id: model.store.current?.id) { await model.pollNowPlaying() }
     }
 }
 
@@ -27,8 +32,14 @@ private struct MainView: View {
                 NowPlayingSummary(model: model)
             }
 
+            if model.player.source?.recordingName != nil {
+                RecordingSection(model: model)
+            }
+
             Section {
-                if model.player.wantsToPlay {
+                // A paused recording counts as listening: Listen would
+                // replace it with the live stream.
+                if model.player.wantsToPlay || model.player.source?.recordingName != nil {
                     Button("Stop Listening", systemImage: "headphones.slash") {
                         model.player.stopListening()
                     }
@@ -91,6 +102,77 @@ private struct MainView: View {
             }
         }
         .navigationTitle("AntennaHead")
+    }
+}
+
+/// The recording playing on the Watch: progress, back / play-pause /
+/// forward, and a way back to the live stream.
+private struct RecordingSection: View {
+    let model: WatchModel
+
+    private var player: WatchAudioPlayer { model.player }
+
+    var body: some View {
+        Section("Recording") {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(player.source?.recordingName ?? "")
+                    .font(.headline)
+                    .lineLimit(2)
+                if let duration = player.duration, duration > 0 {
+                    ProgressView(value: min(player.position ?? 0, duration), total: duration)
+                }
+                Text(timeLine)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                if player.state != .playing && player.state != .paused {
+                    // Loading, reconnecting, or failed: say which.
+                    Text(player.statusText)
+                        .font(.footnote)
+                        .foregroundStyle(player.state == .failed ? .red : .secondary)
+                }
+            }
+            HStack {
+                Button {
+                    player.skip(by: -WatchAudioPlayer.skipBack)
+                } label: {
+                    Image(systemName: "gobackward.15")
+                }
+                .accessibilityLabel("Back 15 seconds")
+                Spacer()
+                Button {
+                    if player.wantsToPlay { player.pause() } else { player.resume() }
+                } label: {
+                    Image(systemName: player.wantsToPlay ? "pause.fill" : "play.fill")
+                        .font(.title3)
+                }
+                .accessibilityLabel(player.wantsToPlay ? "Pause" : "Play")
+                Spacer()
+                Button {
+                    player.skip(by: WatchAudioPlayer.skipForward)
+                } label: {
+                    Image(systemName: "goforward.30")
+                }
+                .accessibilityLabel("Forward 30 seconds")
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            Button("Back to Live", systemImage: "dot.radiowaves.left.and.right") {
+                model.returnToLive()
+            }
+        }
+    }
+
+    /// "1:23 / 45:06", or just the position until the length is known.
+    private var timeLine: String {
+        let position = Self.format(player.position ?? 0)
+        guard let duration = player.duration else { return position }
+        return "\(position) / \(Self.format(duration))"
+    }
+
+    private static func format(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded(.down))
+        let (h, m, s) = (total / 3600, total / 60 % 60, total % 60)
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
     }
 }
 

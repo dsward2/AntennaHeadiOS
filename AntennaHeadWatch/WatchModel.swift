@@ -30,6 +30,7 @@ final class WatchModel {
     var audioFiles: FolderListing?
     var textToSpeechFiles: FolderListing?
     var rssFeeds: [RSSFeedSummary]?
+    var recordings: [RecordingSummary]?
     /// How the last API call reached the server.
     private(set) var route: WatchAPIClient.Route?
     private(set) var isLoading = false
@@ -37,6 +38,12 @@ final class WatchModel {
     /// Set by the app from its scene phase; polls less often in the
     /// background (where the app only runs while audio plays).
     var isForeground = true
+    /// Bumped to send the navigation stack back to Now Playing (`ContentView`).
+    private(set) var navigationRootID = 0
+
+    func returnToNowPlaying() {
+        navigationRootID += 1
+    }
 
     private(set) var client: WatchAPIClient?
     /// The message the poll last put in `errorMessage`, so a later successful
@@ -70,6 +77,7 @@ final class WatchModel {
             audioFiles = nil
             textToSpeechFiles = nil
             rssFeeds = nil
+            recordings = nil
         }
         errorMessage = nil
         isLoading = true
@@ -136,12 +144,39 @@ final class WatchModel {
     }
 
     func listen() async {
-        guard let server = store.current, let base = server.baseURL,
-              let url = URL(string: "/hls/index.m3u8", relativeTo: base) else {
+        guard let server = store.current, let url = liveURL else {
             errorMessage = "The server's address isn't valid."
             return
         }
-        await player.listen(to: url, authorization: server.basicAuthorization)
+        await player.play(.live(url), authorization: server.basicAuthorization)
+    }
+
+    /// The current server's live HLS stream.
+    var liveURL: URL? {
+        store.current?.baseURL.flatMap { URL(string: "/hls/index.m3u8", relativeTo: $0) }
+    }
+
+    /// Plays a recording on the Watch, from AntennaHead's Range-capable
+    /// download route (so it seeks), not through the live stream.
+    func playRecording(_ recording: RecordingSummary) async {
+        guard let server = store.current, let base = server.baseURL,
+              let url = URL(string: recording.downloadPath, relativeTo: base) else {
+            errorMessage = "The server's address isn't valid."
+            return
+        }
+        errorMessage = nil
+        await player.play(.recording(url, name: Self.displayName(recording.fileName)),
+                          authorization: server.basicAuthorization)
+    }
+
+    func returnToLive() {
+        guard let url = liveURL else { return }
+        player.returnToLive(url)
+    }
+
+    /// A recording's file name without its extension.
+    static func displayName(_ fileName: String) -> String {
+        (fileName as NSString).deletingPathExtension
     }
 
     /// Runs a "start listening to X" call: shows the server's new Now
@@ -153,7 +188,7 @@ final class WatchModel {
             apply(try await action(client))
             route = client.lastRoute
             errorMessage = nil
-            player.jumpToLiveEdge()
+            player.jumpToLiveEdge(liveURL: liveURL)
         } catch {
             report(error)
         }

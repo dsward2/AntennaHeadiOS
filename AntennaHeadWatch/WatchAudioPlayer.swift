@@ -20,14 +20,47 @@ import os
 /// - **Now Playing** details and play/pause for the system's Now Playing
 ///   screen.
 ///
-/// The stream (`/hls/index.m3u8`) always comes straight from the server:
-/// the iPhone relay carries API calls, not audio.
+/// It also plays **recordings** (`Source.recording`): AntennaHead's
+/// Range-capable `/recordings-download/…` files, which seek. A recording
+/// resumes where it was paused, retries from the same position after a
+/// network failure, skips back and forward, and stops at its end instead of
+/// reconnecting.
+///
+/// Audio always comes straight from the server: the iPhone relay carries API
+/// calls, not audio.
 @MainActor
 @Observable
 final class WatchAudioPlayer {
     enum State: String {
         case idle, activating, buffering, playing, reconnecting, paused, failed
     }
+
+    enum Source: Equatable {
+        /// The live HLS stream.
+        case live(URL)
+        /// A recording file, with its name for display.
+        case recording(URL, name: String)
+
+        var url: URL {
+            switch self {
+            case .live(let url), .recording(let url, _): url
+            }
+        }
+
+        var isLive: Bool {
+            if case .live = self { return true }
+            return false
+        }
+
+        var recordingName: String? {
+            if case .recording(_, let name) = self { return name }
+            return nil
+        }
+    }
+
+    /// Skip intervals for recordings (the Now Playing screen's buttons too).
+    static let skipBack: Double = 15
+    static let skipForward: Double = 30
 
     private(set) var state: State = .idle
     private(set) var statusText = "Not listening"
@@ -36,13 +69,21 @@ final class WatchAudioPlayer {
     /// Now Playing pause, or losing the output.
     private(set) var wantsToPlay = false
 
+    private(set) var source: Source?
+    /// A recording's playback position and length, in seconds, updated
+    /// every half second while one is loaded; `nil` for the live stream.
+    private(set) var position: Double?
+    private(set) var duration: Double?
+
     var nowPlayingTitle: String? { didSet { updateNowPlayingInfo() } }
     var nowPlayingSubtitle: String? { didSet { updateNowPlayingInfo() } }
 
     private static let log = Logger(subsystem: "com.dsward.AntennaHeadiOS.watchkitapp", category: "Player")
 
-    private var url: URL?
     private var isInterrupted = false
+    /// Where a recording picks up after a failure or a reload.
+    private var resumePosition: Double = 0
+    private var timeObserver: Any?
     private var reconnectAttempt = 0
     private var reconnectTask: Task<Void, Never>?
     private var stallWatchdog: Task<Void, Never>?
@@ -59,15 +100,18 @@ final class WatchAudioPlayer {
         observePlayer()
         observeAudioSession()
         setUpRemoteCommands()
+        observePosition()
     }
 
     // MARK: Commands
 
-    /// Starts listening to `url`: picks an output (the system may ask), then
-    /// loads the stream.
-    func listen(to url: URL, authorization: String?) async {
-        self.url = url
+    /// Starts `source`: picks an output (the system may ask), then loads it.
+    func play(_ source: Source, authorization: String?) async {
+        self.source = source
         self.authorization = authorization
+        resumePosition = 0
+        position = source.isLive ? nil : 0
+        duration = nil
         wantsToPlay = true
         reconnectAttempt = 0
         cancelRecovery()
@@ -96,28 +140,88 @@ final class WatchAudioPlayer {
         cancelRecovery()
         player.pause()
         player.replaceCurrentItem(with: nil)
+        source = nil
+        position = nil
+        duration = nil
         setState(.idle, status)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    /// Pause from the system Now Playing screen. Unlike `stopListening()`,
-    /// keeps the audio session and the Now Playing entry, so watchOS keeps
-    /// sending this app the play command. (Clearing them made play do
-    /// nothing.) The live item is dropped so play starts at the live edge.
+    /// Pause, from the app or the system Now Playing screen. Unlike
+    /// `stopListening()`, keeps the audio session and the Now Playing entry,
+    /// so watchOS keeps sending this app the play command. (Clearing them
+    /// made play do nothing.) The live item is dropped so play starts at the
+    /// live edge; a recording keeps its item and position.
     func pause() {
         wantsToPlay = false
         cancelRecovery()
         player.pause()
-        player.replaceCurrentItem(with: nil)
+        if source?.isLive != false {
+            player.replaceCurrentItem(with: nil)
+        } else {
+            resumePosition = player.currentTime().seconds.finiteOrZero
+        }
         setState(.paused, "Paused")
     }
 
+    /// Resume after `pause()`: a recording continues where it was, the live
+    /// stream restarts at the live edge. No output picker, since the session
+    /// is still active.
+    func resume() {
+        guard source != nil, !wantsToPlay else { return }
+        wantsToPlay = true
+        reconnectAttempt = 0
+        if source?.isLive == false, let item = player.currentItem, item.status != .failed {
+            player.play()
+            setState(.buffering, "Resuming…")
+        } else {
+            loadFreshItem()
+        }
+    }
+
     /// The server changed (tune, scan, Stop): a fresh item jumps to the live
-    /// edge so the change is heard now, not after the buffer drains.
-    func jumpToLiveEdge() {
+    /// edge so the change is heard now, not after the buffer drains. If a
+    /// recording was playing, switch back to the live stream, as the Apple TV
+    /// app does, since the listener just chose something live.
+    func jumpToLiveEdge(liveURL: URL?) {
         guard wantsToPlay, !isInterrupted, state != .activating else { return }
+        if source?.isLive == false {
+            guard let liveURL else { return }
+            source = .live(liveURL)
+            position = nil
+            duration = nil
+        }
         reconnectAttempt = 0
         loadFreshItem()
+    }
+
+    /// Switch from a recording back to the live stream.
+    func returnToLive(_ liveURL: URL) {
+        source = .live(liveURL)
+        position = nil
+        duration = nil
+        wantsToPlay = true
+        reconnectAttempt = 0
+        loadFreshItem()
+    }
+
+    /// Moves a recording's position by `seconds` (negative skips back).
+    func skip(by seconds: Double) {
+        guard let current = position else { return }
+        seek(to: current + seconds)
+    }
+
+    func seek(to seconds: Double) {
+        guard source?.isLive == false else { return }
+        let upper = (duration ?? .infinity) - 0.5
+        let target = max(0, min(seconds, upper))
+        resumePosition = target
+        position = target
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600),
+                    toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in self.updateNowPlayingInfo() }
+        }
     }
 
     /// The app came back to the foreground. If audio is wanted but isn't
@@ -126,13 +230,17 @@ final class WatchAudioPlayer {
         guard wantsToPlay, !isInterrupted, reconnectTask == nil, state != .activating,
               player.timeControlStatus != .playing else { return }
         reconnectAttempt = 0
-        loadFreshItem()
+        if source?.isLive == false, let item = player.currentItem, item.status == .readyToPlay {
+            player.play()
+        } else {
+            loadFreshItem()
+        }
     }
 
     // MARK: Loading
 
     private func loadFreshItem() {
-        guard let url else { return }
+        guard let source else { return }
         cancelRecovery()
         // watchOS has no AVAssetResourceLoader to answer a 401 the way the
         // iPhone app does, so the login is sent up front with every playlist
@@ -142,23 +250,20 @@ final class WatchAudioPlayer {
         if let authorization {
             options["AVURLAssetHTTPHeaderFieldsKey"] = ["Authorization": authorization]
         }
-        let asset = AVURLAsset(url: url, options: options)
+        let asset = AVURLAsset(url: source.url, options: options)
         let item = AVPlayerItem(asset: asset)
         observe(item)
         player.replaceCurrentItem(with: item)
+        if !source.isLive, resumePosition > 0 {
+            // Pick up where the recording was (after a failure or reload).
+            player.seek(to: CMTime(seconds: resumePosition, preferredTimescale: 600),
+                        toleranceBefore: .zero, toleranceAfter: .zero)
+        }
         player.play()
-        setState(.buffering, "Connecting…")
+        setState(.buffering, source.isLive ? "Connecting…"
+                 : "Loading recording… The Mac may take a minute to prepare a long one the first time.")
     }
 
-    /// Restarts after a Now Playing screen play command. The session is
-    /// still active from the last Listen (`pause()` keeps it), so no output
-    /// picker.
-    private func resumeFromRemote() {
-        guard url != nil, !wantsToPlay else { return }
-        wantsToPlay = true
-        reconnectAttempt = 0
-        loadFreshItem()
-    }
 
     // MARK: Recovery
 
@@ -167,6 +272,10 @@ final class WatchAudioPlayer {
         stallWatchdog?.cancel()
         stallWatchdog = nil
         reconnectAttempt += 1
+        if source?.isLive == false {
+            // Retry from where the recording got to.
+            resumePosition = position ?? resumePosition
+        }
         let delay = min(pow(2.0, Double(reconnectAttempt - 1)), 15)
         setState(.reconnecting, "\(reason) — retrying in \(Int(delay)) s")
         reconnectTask = Task { [weak self] in
@@ -203,10 +312,13 @@ final class WatchAudioPlayer {
             stallWatchdog?.cancel()
             stallWatchdog = nil
             let route = AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName
-            setState(.playing, route.map { "Listening on \($0)" } ?? "Listening")
+            let what = source?.isLive == false ? "Playing recording" : "Listening"
+            setState(.playing, route.map { "\(what) on \($0)" } ?? what)
         case .waitingToPlayAtSpecifiedRate:
             guard wantsToPlay else { return }
-            if state != .reconnecting {
+            // Keep a more specific message ("Connecting…", "Loading
+            // recording…", "Resuming…") while one's showing.
+            if state != .reconnecting && state != .buffering {
                 setState(.buffering, "Buffering…")
             }
             startStallWatchdog()
@@ -234,8 +346,10 @@ final class WatchAudioPlayer {
         }
     }
 
+    /// A live stream that stays "buffering" this long isn't coming back on
+    /// its own. A recording is a finite download that may just be slow.
     private func startStallWatchdog() {
-        guard stallWatchdog == nil else { return }
+        guard stallWatchdog == nil, source?.isLive != false else { return }
         stallWatchdog = Task { [weak self] in
             try? await Task.sleep(for: .seconds(12))
             guard let self, !Task.isCancelled else { return }
@@ -267,10 +381,42 @@ final class WatchAudioPlayer {
                 }
             },
             center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
-                // A live stream doesn't end: the server went away or restarted.
-                MainActor.assumeIsolated { self?.scheduleRecovery("Stream ended") }
+                MainActor.assumeIsolated { self?.itemReachedEnd() }
             },
         ]
+    }
+
+    private func itemReachedEnd() {
+        guard let source else { return }
+        if source.isLive {
+            // A live stream doesn't end: the server went away or restarted.
+            scheduleRecovery("Stream ended")
+        } else {
+            // Stay loaded at the start, so play goes again from the top.
+            wantsToPlay = false
+            cancelRecovery()
+            player.pause()
+            seek(to: 0)
+            setState(.paused, "Finished")
+        }
+    }
+
+    /// Keeps `position` and `duration` current for a recording (the app's
+    /// progress bar and the Now Playing screen's elapsed time).
+    private func observePosition() {
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+                                                      queue: .main) { [weak self] time in
+            MainActor.assumeIsolated {
+                guard let self, self.source?.isLive == false else { return }
+                let seconds = time.seconds
+                if seconds.isFinite { self.position = seconds }
+                if let length = self.player.currentItem?.duration.seconds, length.isFinite, length > 0,
+                   self.duration != length {
+                    self.duration = length
+                    self.updateNowPlayingInfo()
+                }
+            }
+        }
     }
 
     private static func describe(_ error: Error?, item: AVPlayerItem?) -> String {
@@ -337,7 +483,7 @@ final class WatchAudioPlayer {
     private func setUpRemoteCommands() {
         let commands = MPRemoteCommandCenter.shared()
         commands.playCommand.addTarget { [weak self] _ in
-            MainActor.assumeIsolated { self?.resumeFromRemote() }
+            MainActor.assumeIsolated { self?.resume() }
             return .success
         }
         commands.pauseCommand.addTarget { [weak self] _ in
@@ -347,12 +493,30 @@ final class WatchAudioPlayer {
         commands.togglePlayPauseCommand.addTarget { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if self.wantsToPlay { self.pause() } else { self.resumeFromRemote() }
+                if self.wantsToPlay { self.pause() } else { self.resume() }
             }
             return .success
         }
         commands.nextTrackCommand.isEnabled = false
         commands.previousTrackCommand.isEnabled = false
+
+        // Recordings only (enabled in `updateNowPlayingInfo()`).
+        commands.skipBackwardCommand.preferredIntervals = [NSNumber(value: Self.skipBack)]
+        commands.skipForwardCommand.preferredIntervals = [NSNumber(value: Self.skipForward)]
+        commands.skipBackwardCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.skip(by: -Self.skipBack) }
+            return .success
+        }
+        commands.skipForwardCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.skip(by: Self.skipForward) }
+            return .success
+        }
+        commands.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            let target = event.positionTime
+            MainActor.assumeIsolated { self?.seek(to: target) }
+            return .success
+        }
     }
 
     private func updateNowPlayingInfo() {
@@ -362,14 +526,27 @@ final class WatchAudioPlayer {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
         }
+        let isRecording = source?.isLive == false
+        let commands = MPRemoteCommandCenter.shared()
+        commands.skipBackwardCommand.isEnabled = isRecording
+        commands.skipForwardCommand.isEnabled = isRecording
+        commands.changePlaybackPositionCommand.isEnabled = isRecording
+
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: nowPlayingTitle ?? "AntennaHead",
             MPMediaItemPropertyAlbumTitle: "AntennaHead",
-            MPNowPlayingInfoPropertyIsLiveStream: true,
+            MPNowPlayingInfoPropertyIsLiveStream: !isRecording,
             MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? 1.0 : 0.0,
         ]
-        if let nowPlayingSubtitle, !nowPlayingSubtitle.isEmpty {
-            info[MPMediaItemPropertyArtist] = nowPlayingSubtitle
+        if let name = source?.recordingName {
+            info[MPMediaItemPropertyTitle] = name
+            info[MPMediaItemPropertyArtist] = "Recording"
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position ?? 0
+            if let duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
+        } else {
+            info[MPMediaItemPropertyTitle] = nowPlayingTitle ?? "AntennaHead"
+            if let nowPlayingSubtitle, !nowPlayingSubtitle.isEmpty {
+                info[MPMediaItemPropertyArtist] = nowPlayingSubtitle
+            }
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
@@ -380,4 +557,9 @@ final class WatchAudioPlayer {
         statusText = text
         updateNowPlayingInfo()
     }
+}
+
+private extension Double {
+    /// `self`, or 0 for NaN/infinity (e.g. `CMTime.invalid.seconds`).
+    var finiteOrZero: Double { isFinite ? self : 0 }
 }

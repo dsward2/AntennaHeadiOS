@@ -85,6 +85,8 @@ final class WatchAPIClient {
 
     func devices() async throws -> [DeviceSummary] { try await get(APIEndpoint.devices) }
 
+    func recordings() async throws -> [RecordingSummary] { try await get(APIEndpoint.recordings) }
+
     func startDevice(name: String) async throws -> NowPlayingStatus {
         try await post(APIEndpoint.startDevice, StartDeviceRequest(deviceName: name))
     }
