@@ -82,11 +82,19 @@ struct ServerEditView: View {
             TextField("Name", text: $name)
             TextField("host:port", text: $address)
                 .textContentType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
             Toggle("HTTPS", isOn: $usesHTTPS)
             Section("Web login (optional)") {
+                // No autocorrect: it turned "dsward" into "Edward".
                 TextField("Username", text: $username)
                     .textContentType(.username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                 SecureField("Password", text: $password)
+                    .textContentType(.password)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
             }
             Button("Save") {
                 let saved = WatchLink.Server(
