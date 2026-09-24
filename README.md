@@ -121,8 +121,17 @@ one tap: ControlBooth pipelines, the AirPlay Receiver, Gqrx (launch, or play
 a bookmark, in stereo or mono), the Mac's input devices, Play Audio Files
 (everything, a playlist, or one file), Text to Speech (everything or one
 file), and Speak RSS Headlines (all feeds or one). Order and Repeat are
-remembered. Selecting several files at once, Spatial Audio, Captions, and
-Recordings are left to the other clients.
+remembered. Selecting several files at once, Spatial Audio, and Captions
+are left to the other clients.
+
+**Recordings** (also under More Sources) plays AntennaHead's recordings on
+the Watch itself, newest first, from the Range-capable
+`/recordings-download/` route, so they seek. Tapping one goes back to Now
+Playing with a Recording section: progress, back 15 s, pause/resume, forward
+30 s, and **Back to Live**. The system Now Playing screen gets the same skip
+buttons and a scrubber. Tuning, scanning, or Stop switch back to the live
+stream. The first play of a long `.aac` recording can take a minute or two:
+the Mac remuxes it to `.m4a` once and caches the result.
 
 **Reaching the server.** watchOS has no VPN. The Watch calls the API
 directly first. That works at home, and also away from home when its traffic

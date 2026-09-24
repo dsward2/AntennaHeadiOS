@@ -25,6 +25,11 @@ extension WatchModel {
     func loadTextToSpeechFiles() async { await load({ try await $0.textToSpeechFiles() }, into: \.textToSpeechFiles) }
     func loadRSSFeeds() async { await load({ try await $0.rssFeeds() }, into: \.rssFeeds) }
 
+    /// Newest first.
+    func loadRecordings() async {
+        await load({ try await $0.recordings().sorted { $0.modifiedAt > $1.modifiedAt } }, into: \.recordings)
+    }
+
     func loadGqrxBookmarks() async {
         guard let client else { return }
         do {
@@ -81,7 +86,7 @@ extension WatchModel {
             gqrxStatus = try await client.launchGqrx()
             errorMessage = nil
             await refreshNowPlaying()
-            player.jumpToLiveEdge()
+            player.jumpToLiveEdge(liveURL: liveURL)
         } catch {
             report(error)
         }

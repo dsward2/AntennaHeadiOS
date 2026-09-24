@@ -6,16 +6,8 @@ import SwiftUI
 /// Watch's own audio, as on the main screen.
 struct SourcesView: View {
     let model: WatchModel
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        sourceList
-            // Dismissing this screen also pops the source screen above it,
-            // which lands back on Now Playing.
-            .environment(\.returnToNowPlaying, ReturnAction { dismiss() })
-    }
-
-    private var sourceList: some View {
         List {
             NavigationLink { ControlBoothView(model: model) } label: {
                 Label("ControlBooth", systemImage: "slider.horizontal.3")
@@ -38,19 +30,14 @@ struct SourcesView: View {
             NavigationLink { RSSHeadlinesView(model: model) } label: {
                 Label("RSS Headlines", systemImage: "newspaper")
             }
+            NavigationLink { RecordingsView(model: model) } label: {
+                // Not "recordingtape": that symbol is wide enough to run into
+                // the label on the Watch.
+                Label("Recordings", systemImage: "waveform.circle")
+            }
         }
         .navigationTitle("Sources")
     }
-}
-
-/// Goes back to Now Playing from a source screen (two levels down).
-struct ReturnAction {
-    let action: @MainActor () -> Void
-    @MainActor func callAsFunction() { action() }
-}
-
-extension EnvironmentValues {
-    @Entry var returnToNowPlaying = ReturnAction {}
 }
 
 extension View {
@@ -62,17 +49,19 @@ extension View {
 }
 
 /// Runs a start action, then goes back to Now Playing if it worked.
+/// (Through the model: a pushed screen gets its environment from the
+/// navigation stack, not from the Sources screen, so an environment action
+/// set there never arrived.)
 private struct StartButton<Label: View>: View {
     let model: WatchModel
     let action: () async -> Void
     @ViewBuilder let label: () -> Label
-    @Environment(\.returnToNowPlaying) private var returnToNowPlaying
 
     var body: some View {
         Button {
             Task {
                 await action()
-                if model.errorMessage == nil { returnToNowPlaying() }
+                if model.errorMessage == nil { model.returnToNowPlaying() }
             }
         } label: {
             label()
@@ -474,5 +463,49 @@ private struct RSSHeadlinesView: View {
         .navigationTitle("RSS Headlines")
         .freshErrors(model)
         .task { await model.loadRSSFeeds() }
+    }
+}
+
+// MARK: Recordings
+
+/// AntennaHead's recordings, newest first. Unlike the other sources, a
+/// recording plays on the Watch itself (it's downloaded as it plays, so it
+/// can pause and skip), and the Mac carries on with whatever it's doing.
+private struct RecordingsView: View {
+    let model: WatchModel
+
+    var body: some View {
+        List {
+            if let recordings = model.recordings {
+                if recordings.isEmpty {
+                    Text("No recordings")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Section {
+                        ForEach(recordings) { recording in
+                            StartButton(model: model) {
+                                await model.playRecording(recording)
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text(WatchModel.displayName(recording.fileName))
+                                        .lineLimit(3)
+                                    Text(recording.modifiedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } footer: {
+                        Text("Plays on this Watch. Needs headphones and a direct connection to the Mac. The first play of a long recording can take a minute or two while the Mac prepares it.")
+                    }
+                }
+            } else {
+                ProgressView()
+            }
+            ErrorSection(model: model)
+        }
+        .navigationTitle("Recordings")
+        .freshErrors(model)
+        .task { await model.loadRecordings() }
     }
 }
