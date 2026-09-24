@@ -6,6 +6,8 @@ struct ServersView: View {
     let model: WatchModel
     @State private var network = NetworkPathMonitor()
     @Environment(\.dismiss) private var dismiss
+    /// The Watch-added server being edited.
+    @State private var editing: WatchLink.Server?
 
     private var store: WatchServerStore { model.store }
 
@@ -13,22 +15,43 @@ struct ServersView: View {
         List {
             Section {
                 ForEach(store.allServers) { server in
-                    Button {
-                        store.select(server)
-                        dismiss()
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(server.name)
-                                Text(store.isFromPhone(server) ? "From iPhone" : server.address)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                    HStack {
+                        Button {
+                            store.select(server)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(server.name)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                    Text(store.isFromPhone(server) ? "From iPhone" : server.address)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                }
+                                Spacer()
+                                if server.id == store.current?.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.tint)
+                                }
                             }
-                            Spacer()
-                            if server.id == store.current?.id {
-                                Image(systemName: "checkmark")
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if !store.isFromPhone(server) {
+                            // Visible, since swipe actions are easy to miss.
+                            // (The swipe below still works too.)
+                            Button {
+                                editing = server
+                            } label: {
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.title3)
                                     .foregroundStyle(.tint)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Edit \(server.name)")
                         }
                     }
                     .swipeActions {
@@ -36,10 +59,8 @@ struct ServersView: View {
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 store.deleteWatchServer(server)
                             }
-                            NavigationLink {
-                                ServerEditView(store: store, server: server)
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
+                            Button("Edit", systemImage: "pencil") {
+                                editing = server
                             }
                         }
                     }
@@ -62,6 +83,9 @@ struct ServersView: View {
             }
         }
         .navigationTitle("Servers")
+        .navigationDestination(item: $editing) { server in
+            ServerEditView(store: store, server: server)
+        }
     }
 }
 
