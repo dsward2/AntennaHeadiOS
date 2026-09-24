@@ -164,4 +164,9 @@ to the Mac by USB. The first build for a new Watch needs
 
 - Trust AntennaHead's self-signed HTTPS certificate on first use (pinning).
 - A setting to turn off `resumesAfterAllInterruptions`.
-- Watch: HTTPS with AntennaHead's self-signed certificate.
+- HTTPS with AntennaHead's self-signed certificate. The Watch can't
+  support it at all (watchOS has no `AVAssetResourceLoader`, so its player
+  only trusts certificates the system trusts). HTTPS with a trusted
+  certificate works: give the server the certificate's name and HTTPS
+  port, e.g. `mac.example.com:8094`, with HTTPS on. Verified in the watchOS
+  simulator with the web login on, for both the API and the stream.
