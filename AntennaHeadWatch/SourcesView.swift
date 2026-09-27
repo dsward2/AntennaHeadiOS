@@ -10,7 +10,7 @@ struct SourcesView: View {
     var body: some View {
         List {
             NavigationLink { ControlBoothView(model: model) } label: {
-                Label("ControlBooth", systemImage: "slider.horizontal.3")
+                Label("ControlBooth", image: "ControlBoothGlyph")
             }
             NavigationLink { AirPlayView(model: model) } label: {
                 Label("AirPlay Receiver", systemImage: "airplayaudio")
