@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 import WebKit
 import os
@@ -15,6 +16,12 @@ import os
 ///   - `{command: "playFile", url, loop}` — play a recording ("fast download")
 ///   - `{command: "toggle", url}` — the ▶︎/❚❚ button
 ///   - `{command: "showServers"}` — the ⋯ button, back to the server list
+///   - `{command: "airPlaySlot", x, y, width, height, color}` — where the
+///     page left room for an AirPlay button; the app lays a native one
+///     (`AVRoutePickerView`) over it
+/// - Before the page loads, the app defines
+///   `window.antennaheadNativeAirPlaySupported = true`; the page only makes
+///   the AirPlay slot when that's set, so an older app gets none.
 /// - The app reports player state by calling the page's
 ///   `antennaheadNativeAudioState(state, status)`.
 /// - The page defines `antennaheadNativeAudioSupported`. An older server
@@ -40,6 +47,9 @@ struct AntennaHeadWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(WeakScriptMessageHandler(context.coordinator),
                                                 name: Coordinator.handlerName)
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: "window.antennaheadNativeAirPlaySupported = true;",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         // Only matters for an older server's page that still plays through
         // <audio>.
         configuration.allowsInlineMediaPlayback = true
@@ -86,6 +96,7 @@ struct AntennaHeadWebView: UIViewRepresentable {
         var parent: AntennaHeadWebView
         weak var webView: WKWebView?
         var lastReloadToken: Int
+        private let airPlayButton = AirPlayButton()
 
         init(parent: AntennaHeadWebView) {
             self.parent = parent
@@ -160,12 +171,23 @@ struct AntennaHeadWebView: UIViewRepresentable {
             case "showServers":
                 player.stop()
                 parent.store.disconnect()
+            case "airPlaySlot":
+                guard let webView else { return }
+                let number = { (key: String) in CGFloat((body[key] as? NSNumber)?.doubleValue ?? 0) }
+                let rect = CGRect(x: number("x"), y: number("y"),
+                                  width: number("width"), height: number("height"))
+                airPlayButton.place(in: webView, at: rect, cssColor: body["color"] as? String)
             default:
                 break
             }
         }
 
         // MARK: Navigation
+
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            // The next page reports its own slot, if it has one.
+            airPlayButton.remove()
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parent.onLoadError(nil)
@@ -300,6 +322,57 @@ struct AntennaHeadWebView: UIViewRepresentable {
             while let presented = top.presentedViewController { top = presented }
             top.present(alert, animated: true)
         }
+    }
+}
+
+/// The AirPlay button in the page's native-controls row.
+///
+/// A page can't open the system audio output picker (the list Control
+/// Center's AirPlay button shows), so the page leaves an empty button-shaped
+/// slot and this lays a real `AVRoutePickerView` over it. The native player
+/// follows whatever output is chosen, since it plays through the shared
+/// audio session. The page's audio bar is `position: fixed`, so the slot
+/// doesn't move when the page scrolls; the page re-reports it on resize.
+@MainActor
+private final class AirPlayButton {
+    private let pickerView: AVRoutePickerView = {
+        let picker = AVRoutePickerView()
+        picker.prioritizesVideoDevices = false
+        picker.accessibilityLabel = "AirPlay"
+        return picker
+    }()
+
+    func place(in webView: WKWebView, at rect: CGRect, cssColor: String?) {
+        guard rect.width > 0, rect.height > 0 else {
+            remove()
+            return
+        }
+        if pickerView.superview !== webView {
+            webView.addSubview(pickerView)
+        }
+        // The rect is in CSS pixels from the top-left of the page's visible
+        // area, the same as the web view's points at 100% zoom.
+        let inset = webView.scrollView.adjustedContentInset
+        pickerView.frame = rect.offsetBy(dx: inset.left, dy: inset.top)
+        if let color = cssColor.flatMap(Self.color(fromCSS:)) {
+            pickerView.tintColor = color   // match the page's other buttons
+        }
+    }
+
+    func remove() {
+        pickerView.removeFromSuperview()
+    }
+
+    /// Parses `getComputedStyle().color`, which is always `rgb(r, g, b)` or
+    /// `rgba(r, g, b, a)`.
+    private static func color(fromCSS css: String) -> UIColor? {
+        guard let open = css.firstIndex(of: "("), let close = css.lastIndex(of: ")") else { return nil }
+        let parts = css[css.index(after: open)..<close]
+            .split(separator: ",")
+            .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count >= 3 else { return nil }
+        return UIColor(red: parts[0] / 255, green: parts[1] / 255, blue: parts[2] / 255,
+                       alpha: parts.count > 3 ? parts[3] : 1)
     }
 }
 
