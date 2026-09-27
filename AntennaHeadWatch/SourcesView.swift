@@ -10,7 +10,7 @@ struct SourcesView: View {
     var body: some View {
         List {
             NavigationLink { ControlBoothView(model: model) } label: {
-                Label("ControlBooth", image: "ControlBoothGlyph")
+                Label { Text("ControlBooth") } icon: { ControlBoothGlyph() }
             }
             NavigationLink { AirPlayView(model: model) } label: {
                 Label("AirPlay Receiver", systemImage: "airplayaudio")
@@ -507,5 +507,17 @@ private struct RecordingsView: View {
         .navigationTitle("Recordings")
         .freshErrors(model)
         .task { await model.loadRecordings() }
+    }
+}
+
+/// ControlBooth's mixing-board glyph (the `ControlBoothGlyph` template image),
+/// sized like an SF Symbol. An asset image draws at its SVG's own 100 pt, so
+/// it takes its frame from a hidden SF Symbol instead, which follows the
+/// surrounding font the way the neighbouring symbols do.
+struct ControlBoothGlyph: View {
+    var body: some View {
+        Image(systemName: "square")
+            .hidden()
+            .overlay { Image("ControlBoothGlyph").resizable().scaledToFit() }
     }
 }
