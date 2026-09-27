@@ -93,11 +93,23 @@ final class NativeAudioPlayer {
     private var reconnectTask: Task<Void, Never>?
     private var stallWatchdog: Task<Void, Never>?
 
-    private var player = AVPlayer()
+    private var player = NativeAudioPlayer.makePlayer()
     private var playerObservations: [NSKeyValueObservation] = []
     private var itemObservation: NSKeyValueObservation?
     private var itemNotificationTokens: [NSObjectProtocol] = []
     private let authDelegate = BasicAuthResourceLoaderDelegate()
+
+    /// With external playback on (AVPlayer's default), choosing an Apple TV
+    /// as the output hands it the stream URL to fetch and play on its own.
+    /// That fails here: the Apple TV can't use the web login, which only
+    /// this app's resource loader supplies. It showed the program name and
+    /// a ⃠ in silence. With it off, the phone plays the stream and sends the
+    /// audio over AirPlay, the same as it does to a HomePod.
+    private static func makePlayer() -> AVPlayer {
+        let player = AVPlayer()
+        player.allowsExternalPlayback = false
+        return player
+    }
 
     init() {
         observePlayer()
@@ -484,7 +496,7 @@ final class NativeAudioPlayer {
         cancelRecovery()
         playerObservations = []
         itemObservation = nil
-        player = AVPlayer()
+        player = Self.makePlayer()
         observePlayer()
         if wantsToPlay {
             reconnectAttempt = 0
