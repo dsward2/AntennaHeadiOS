@@ -77,6 +77,22 @@ extension WatchModel {
         await loadControlBoothStatus()
     }
 
+    // MARK: AntennaHead Radio
+
+    /// The station switches AntennaHead to itself a few seconds after this
+    /// returns; Now Playing picks that up on its own.
+    func startRadio() async {
+        await perform { try await $0.startRadio() }
+        await loadControlBoothStatus()
+    }
+
+    /// The station hands AntennaHead back to the filler as it stops, and
+    /// listening continues into it.
+    func stopRadio() async {
+        await perform { try await $0.stopRadio() }
+        await loadControlBoothStatus()
+    }
+
     // MARK: Gqrx
 
     /// Launches Gqrx and starts listening to it (the server does both).
