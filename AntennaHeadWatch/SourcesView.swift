@@ -15,6 +15,9 @@ struct SourcesView: View {
             NavigationLink { AirPlayView(model: model) } label: {
                 Label("AirPlay Receiver", systemImage: "airplayaudio")
             }
+            NavigationLink { RadioView(model: model) } label: {
+                Label("AntennaHead Radio", systemImage: "radio")
+            }
             NavigationLink { GqrxView(model: model) } label: {
                 Label("Gqrx", systemImage: "dot.radiowaves.left.and.right")
             }
@@ -198,6 +201,68 @@ private struct AirPlayView: View {
         if !enabled { return "AirPlay: Not in use" }
         if status.airPlayReceivingAudio == true { return "Receiving AirPlay audio" }
         return "Idle — no AirPlay client connected"
+    }
+}
+
+// MARK: AntennaHead Radio
+
+/// ControlBooth's AntennaHead Radio station: Go On Air / Stop, like the web
+/// page's ControlBooth section. Refreshes while open, since the station takes
+/// a few seconds to start and changes segments on its own.
+private struct RadioView: View {
+    let model: WatchModel
+
+    var body: some View {
+        List {
+            if let status = model.controlBoothStatus {
+                if !status.isRunning {
+                    LaunchControlBoothSection(model: model,
+                                              message: "AntennaHead Radio is part of ControlBooth, which isn't running.")
+                } else if status.radioPhase == nil {
+                    Text("This ControlBooth doesn't have AntennaHead Radio. Update ControlBooth on the Mac.")
+                        .font(.footnote)
+                } else {
+                    Section {
+                        Text(status.radioStatusText ?? "")
+                            .font(.headline)
+                        if let song = status.radioNowPlaying {
+                            Text(song)
+                                .font(.footnote)
+                        }
+                        if let error = status.radioLastError {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                        if status.isRadioOnAir {
+                            Button("Stop", systemImage: "stop.fill") {
+                                Task { await model.stopRadio() }
+                            }
+                            .disabled(status.radioPhase == "stopping")
+                        } else {
+                            StartButton(model: model) {
+                                await model.startRadio()
+                            } label: {
+                                Label("Go On Air", systemImage: "play.fill")
+                            }
+                        }
+                    } footer: {
+                        Text("Music, announcements, news and weather, set up in ControlBooth's AntennaHead Radio tab.")
+                    }
+                }
+            } else {
+                ProgressView()
+            }
+            ErrorSection(model: model)
+        }
+        .navigationTitle("Radio")
+        .freshErrors(model)
+        .task {
+            while !Task.isCancelled {
+                await model.loadControlBoothStatus()
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
     }
 }
 
