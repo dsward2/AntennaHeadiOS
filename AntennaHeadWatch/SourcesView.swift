@@ -235,6 +235,12 @@ private struct RadioView: View {
                                 .foregroundStyle(.red)
                         }
                         if status.isRadioOnAir {
+                            if status.radioCanSkip != nil {
+                                Button("Skip Song", systemImage: "forward.end.fill") {
+                                    Task { await model.skipRadioSong() }
+                                }
+                                .disabled(status.radioCanSkip != true)
+                            }
                             Button("Stop", systemImage: "stop.fill") {
                                 Task { await model.stopRadio() }
                             }

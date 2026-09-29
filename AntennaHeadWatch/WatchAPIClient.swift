@@ -103,6 +103,7 @@ final class WatchAPIClient {
     func stopAirPlay() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothAirPlayStop, body: nil) }
     func startRadio() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothRadioStart, body: nil) }
     func stopRadio() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothRadioStop, body: nil) }
+    func skipRadioSong() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothRadioSkip, body: nil) }
 
     func gqrxStatus() async throws -> GqrxStatus { try await get(APIEndpoint.gqrxStatus) }
     func launchGqrx() async throws -> GqrxStatus { try await send("POST", APIEndpoint.gqrxLaunch, body: nil) }
