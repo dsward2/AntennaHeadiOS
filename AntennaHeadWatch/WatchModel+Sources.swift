@@ -86,6 +86,19 @@ extension WatchModel {
         await loadControlBoothStatus()
     }
 
+    /// Gong, fade, next song. The source doesn't change, so unlike the
+    /// actions that go through `perform`, playback is left alone.
+    func skipRadioSong() async {
+        guard let client else { return }
+        do {
+            _ = try await client.skipRadioSong()
+            errorMessage = nil
+        } catch {
+            report(error)
+        }
+        await loadControlBoothStatus()
+    }
+
     /// The station hands AntennaHead back to the filler as it stops, and
     /// listening continues into it.
     func stopRadio() async {
