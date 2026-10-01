@@ -278,6 +278,8 @@ private struct GqrxView: View {
     let model: WatchModel
     /// 1 or 2, remembered between visits.
     @AppStorage("gqrxChannels") private var channels = 2
+    /// True from tapping Launch until the bookmarks have loaded (or given up).
+    @State private var isLaunching = false
 
     var body: some View {
         List {
@@ -290,18 +292,23 @@ private struct GqrxView: View {
                             Label("Play Gqrx", systemImage: "play.fill")
                         }
                     } else {
-                        StartButton(model: model) {
-                            await model.launchGqrx()
+                        // Not a StartButton: stay here, so the bookmarks appear
+                        // on this screen as soon as Gqrx is ready.
+                        Button {
+                            Task { await launch() }
                         } label: {
                             Label("Launch Gqrx", systemImage: "power")
                         }
+                        .disabled(isLaunching)
                     }
                     Toggle("Stereo", isOn: Binding(get: { channels == 2 }, set: { channels = $0 ? 2 : 1 }))
                 }
 
                 if status.isRunning {
                     Section("Bookmarks") {
-                        if let bookmarks = model.gqrxBookmarks {
+                        if isLaunching, model.gqrxBookmarks?.isEmpty != false {
+                            ProgressView()
+                        } else if let bookmarks = model.gqrxBookmarks {
                             if bookmarks.isEmpty {
                                 Text("No bookmarks")
                                     .foregroundStyle(.secondary)
@@ -339,6 +346,24 @@ private struct GqrxView: View {
             if model.gqrxStatus?.isRunning == true {
                 await model.loadGqrxBookmarks()
             }
+        }
+    }
+
+    /// Launches Gqrx (which also starts listening), then loads the bookmarks
+    /// into this screen. Gqrx's remote control takes a few seconds to come up,
+    /// so a failed load is retried before its message is shown.
+    private func launch() async {
+        isLaunching = true
+        defer { isLaunching = false }
+        await model.launchGqrx()
+        guard model.errorMessage == nil else { return }
+        for attempt in 0..<10 {
+            if attempt > 0 { try? await Task.sleep(for: .seconds(1)) }
+            if Task.isCancelled { return }
+            await model.loadGqrxBookmarks()
+            // Right after launch Gqrx can answer with an empty list before it
+            // has loaded its bookmarks, so empty counts as not ready yet.
+            if model.gqrxBookmarks?.isEmpty == false { return }
         }
     }
 
