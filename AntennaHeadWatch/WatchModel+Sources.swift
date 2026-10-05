@@ -20,6 +20,7 @@ extension WatchModel {
 
     func loadDevices() async { await load({ try await $0.devices() }, into: \.devices) }
     func loadControlBoothStatus() async { await load({ try await $0.controlBoothStatus() }, into: \.controlBoothStatus) }
+    func loadDsdNeoStatus() async { await load({ try await $0.dsdNeoStatus() }, into: \.dsdNeoStatus) }
     func loadGqrxStatus() async { await load({ try await $0.gqrxStatus() }, into: \.gqrxStatus) }
     func loadAudioFiles() async { await load({ try await $0.audioFiles() }, into: \.audioFiles) }
     func loadTextToSpeechFiles() async { await load({ try await $0.textToSpeechFiles() }, into: \.textToSpeechFiles) }
@@ -104,6 +105,45 @@ extension WatchModel {
     func stopRadio() async {
         await perform { try await $0.stopRadio() }
         await loadControlBoothStatus()
+    }
+
+    // MARK: dsd-neo
+
+    /// Listens to the scanner (ControlBooth's dsd-neo Scanner pipeline).
+    func startDsdNeo() async {
+        guard let name = dsdNeoStatus?.pipelineName else { return }
+        await perform { try await $0.startControlBoothPipeline(named: name) }
+        await loadDsdNeoStatus()
+    }
+
+    /// Like Stop: the server falls back to the filler, and listening
+    /// continues into it.
+    func stopDsdNeo() async {
+        await perform { try await $0.stopControlBooth() }
+        await loadDsdNeoStatus()
+    }
+
+    /// Switches the scanner to a saved system (AWIN, CWIN, …) and control
+    /// channel. A running scanner restarts on it, so playback goes quiet for
+    /// a few seconds; this stays on the dsd-neo screen.
+    func setDsdNeoConfiguration(id: String, controlChannelHz: Int?) async {
+        guard let client else { return }
+        do {
+            dsdNeoStatus = try await client.setDsdNeoConfiguration(id: id, controlChannelHz: controlChannelHz)
+            errorMessage = nil
+        } catch {
+            report(error)
+        }
+    }
+
+    func skipDsdNeoCall() async {
+        guard let client else { return }
+        do {
+            dsdNeoStatus = try await client.skipDsdNeoCall()
+            errorMessage = nil
+        } catch {
+            report(error)
+        }
     }
 
     // MARK: Gqrx

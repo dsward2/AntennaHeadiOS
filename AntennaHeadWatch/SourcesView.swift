@@ -21,6 +21,9 @@ struct SourcesView: View {
             NavigationLink { GqrxView(model: model) } label: {
                 Label("Gqrx", systemImage: "dot.radiowaves.left.and.right")
             }
+            NavigationLink { DsdNeoView(model: model) } label: {
+                Label("dsd-neo", systemImage: "antenna.radiowaves.left.and.right")
+            }
             NavigationLink { DevicesView(model: model) } label: {
                 Label("Devices", systemImage: "mic")
             }
@@ -369,6 +372,146 @@ private struct GqrxView: View {
 
     private static func megahertz(_ hertz: Int64) -> String {
         String(format: "%.4f MHz", Double(hertz) / 1_000_000)
+    }
+}
+
+// MARK: dsd-neo
+
+/// ControlBooth's dsd-neo Scanner: Listen/Stop/Skip, and which saved system
+/// (AWIN, CWIN, …) and control channel it follows. Choosing a system or
+/// channel stays on this screen — a running scanner restarts on it within a
+/// few seconds — while Listen goes back to Now Playing like the other sources.
+private struct DsdNeoView: View {
+    let model: WatchModel
+    @State private var isSwitching = false
+
+    var body: some View {
+        List {
+            if let status = model.dsdNeoStatus {
+                if !status.isRunning {
+                    LaunchControlBoothSection(model: model, message: "The dsd-neo Scanner is part of ControlBooth, which isn't running.")
+                } else if status.pipelineName == nil {
+                    Text("ControlBooth has no dsd-neo Scanner pipeline. Set it up in ControlBooth's dsd-neo Scanner tab.")
+                        .font(.footnote)
+                } else if !status.installed {
+                    Text("dsd-neo isn't installed on the Mac.")
+                        .font(.footnote)
+                } else {
+                    controls(status)
+                    if status.configurations.isEmpty {
+                        Text("Update ControlBooth on the Mac to choose a system here.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Section("System") {
+                            ForEach(status.configurations) { configuration in
+                                Button {
+                                    switchTo(configuration.id, controlChannelHz: nil)
+                                } label: {
+                                    HStack {
+                                        Text(configuration.name)
+                                        Spacer()
+                                        if configuration.id == status.activeConfigurationID {
+                                            Image(systemName: "checkmark").foregroundStyle(.tint)
+                                        }
+                                    }
+                                }
+                                .disabled(isSwitching)
+                            }
+                        }
+                        if let active = status.activeConfiguration, !active.controlChannels.isEmpty {
+                            Section("Control Channel") {
+                                ForEach(active.controlChannels, id: \.hz) { channel in
+                                    Button {
+                                        switchTo(active.id, controlChannelHz: channel.hz)
+                                    } label: {
+                                        HStack {
+                                            VStack(alignment: .leading) {
+                                                Text(Self.megahertz(channel.hz))
+                                                if !channel.label.isEmpty {
+                                                    Text(channel.label)
+                                                        .font(.footnote)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            Spacer()
+                                            if channel.hz == status.controlChannelHz {
+                                                Image(systemName: "checkmark").foregroundStyle(.tint)
+                                            }
+                                        }
+                                    }
+                                    .disabled(isSwitching)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                ProgressView()
+            }
+            ErrorSection(model: model)
+        }
+        .navigationTitle("dsd-neo")
+        .freshErrors(model)
+        .task {
+            // Refreshes while open: the scanner restarts and hears calls on
+            // its own, and the system can be changed on the Mac.
+            while !Task.isCancelled {
+                if !isSwitching { await model.loadDsdNeoStatus() }
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func controls(_ status: DsdNeoStatus) -> some View {
+        Section {
+            Text(Self.statusText(status))
+                .font(.footnote)
+            if status.isListening {
+                if status.isActive {
+                    Button("Skip Call", systemImage: "forward.end.fill") {
+                        Task { await model.skipDsdNeoCall() }
+                    }
+                }
+                Button("Stop", systemImage: "stop.fill") {
+                    Task { await model.stopDsdNeo() }
+                }
+            } else if status.configured {
+                StartButton(model: model) {
+                    await model.startDsdNeo()
+                } label: {
+                    Label("Listen", systemImage: "play.fill")
+                }
+            } else {
+                Text("Choose a system below, or set up the scanner in ControlBooth.")
+                    .font(.footnote)
+            }
+        }
+    }
+
+    /// Changes the system or channel, then waits for the scanner's restart to
+    /// show up in the status before polling resumes.
+    private func switchTo(_ id: String, controlChannelHz: Int?) {
+        isSwitching = true
+        Task {
+            await model.setDsdNeoConfiguration(id: id, controlChannelHz: controlChannelHz)
+            try? await Task.sleep(for: .seconds(1))
+            isSwitching = false
+        }
+    }
+
+    private static func statusText(_ status: DsdNeoStatus) -> String {
+        switch status.state {
+        case "running": return status.talkgroupText.map { "Running — last heard \($0)" } ?? "Running — waiting for a clear call"
+        case "restarting": return "Restarting dsd-neo"
+        case "failed": return status.message ?? "Stopped after an error"
+        default: return "Not running"
+        }
+    }
+
+    private static func megahertz(_ hertz: Int) -> String {
+        DsdNeoStatus.ControlChannel(hz: hertz, label: "").title
     }
 }
 
