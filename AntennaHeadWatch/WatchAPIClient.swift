@@ -105,6 +105,15 @@ final class WatchAPIClient {
     func stopRadio() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothRadioStop, body: nil) }
     func skipRadioSong() async throws -> NowPlayingStatus { try await send("POST", APIEndpoint.controlBoothRadioSkip, body: nil) }
 
+    func dsdNeoStatus() async throws -> DsdNeoStatus { try await get(APIEndpoint.dsdNeoStatus) }
+
+    func setDsdNeoConfiguration(id: String, controlChannelHz: Int?) async throws -> DsdNeoStatus {
+        try await post(APIEndpoint.dsdNeoConfiguration,
+                       SetDsdNeoConfigurationRequest(configurationID: id, controlChannelHz: controlChannelHz))
+    }
+
+    func skipDsdNeoCall() async throws -> DsdNeoStatus { try await send("POST", APIEndpoint.dsdNeoSkip, body: nil) }
+
     func gqrxStatus() async throws -> GqrxStatus { try await get(APIEndpoint.gqrxStatus) }
     func launchGqrx() async throws -> GqrxStatus { try await send("POST", APIEndpoint.gqrxLaunch, body: nil) }
 

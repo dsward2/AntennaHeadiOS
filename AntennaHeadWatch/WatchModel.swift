@@ -23,6 +23,7 @@ final class WatchModel {
     var devices: [DeviceSummary]?
     var controlBoothStatus: ControlBoothStatus?
     var gqrxStatus: GqrxStatus?
+    var dsdNeoStatus: DsdNeoStatus?
     var gqrxBookmarks: [GqrxBookmarkSummary]?
     /// Why the bookmarks couldn't be loaded (Gqrx's remote control off, say).
     /// Shown in place of the list, since it's a state, not a failed action.
@@ -72,6 +73,7 @@ final class WatchModel {
             devices = nil
             controlBoothStatus = nil
             gqrxStatus = nil
+            dsdNeoStatus = nil
             gqrxBookmarks = nil
             gqrxBookmarksMessage = nil
             audioFiles = nil
